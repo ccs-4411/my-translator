@@ -8,7 +8,6 @@ from deep_translator import GoogleTranslator
 app = Flask(__name__)
 CORS(app)
 
-# 獲取絕對路徑
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # 1. Gemini 設定
@@ -16,7 +15,7 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 if API_KEY:
     genai.configure(api_key=API_KEY)
 
-# 語言對照表 (針對傳統翻譯引擎)
+# 語言對照表
 LANG_MAP = {
     "日文": "ja",
     "英文": "en",
@@ -46,27 +45,38 @@ def translate():
             translated = GoogleTranslator(source='auto', target=target_code).translate(text)
             return jsonify({"translatedText": translated})
 
-        # --- 引擎 B: Gemini AI 翻譯 ---
+        # --- 引擎 B: Gemini AI 翻譯 (具備自動修正路徑功能) ---
         else:
-            # 修正 404 重點：手動加上 models/ 前綴並使用 flash-latest
-            model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
-            prompt = f"你是一位翻譯。翻譯成{target_lang_name}，只要結果：'{text}'"
-            response = model.generate_content(prompt)
+            # 嘗試多種可能的路徑名稱，解決不同伺服器環境下的 404 問題
+            model_names = [
+                'models/gemini-1.5-flash-latest',
+                'models/gemini-1.5-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-flash'
+            ]
             
-            if hasattr(response, 'text'):
-                result = response.text.strip()
-            else:
-                result = response.candidates[0].content.parts[0].text.strip()
+            last_err = ""
+            for name in model_names:
+                try:
+                    model = genai.GenerativeModel(name)
+                    prompt = f"你是一位翻譯官。請將內容翻譯成道地的 {target_lang_name} 口語，只要翻譯結果：'{text}'"
+                    response = model.generate_content(prompt)
+                    
+                    if hasattr(response, 'text'):
+                        return jsonify({"translatedText": response.text.strip()})
+                    else:
+                        res = response.candidates[0].content.parts[0].text.strip()
+                        return jsonify({"translatedText": res})
+                except Exception as e:
+                    last_err = str(e)
+                    continue # 失敗則嘗試下一個模型名稱
             
-            return jsonify({"translatedText": result})
+            # 如果全部嘗試都失敗
+            return jsonify({"translatedText": f"AI 模式暫時失效: {last_err}"}), 404
 
     except Exception as e:
-        error_msg = str(e)
-        print(f"Error detail: {error_msg}")
-        # 如果 1.5 還是 404，這裡回傳友善提示
-        if "404" in error_msg:
-            return jsonify({"translatedText": "模型路徑錯誤(404)，請切換穩定模式或檢查 Region"}), 404
-        return jsonify({"translatedText": f"錯誤: {error_msg}"}), 500
+        print(f"Error: {str(e)}")
+        return jsonify({"translatedText": f"伺服器錯誤: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8888))
