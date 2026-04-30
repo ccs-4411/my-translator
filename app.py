@@ -1,14 +1,18 @@
 import os
-import google.generativeai as genai
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
+from google import genai
 
 app = Flask(__name__)
 CORS(app)
 
-# 取得 API Key
-API_KEY = os.environ.get("GEMINI_API_KEY")
+# 初始化最新版 Google GenAI Client
+def get_client():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
 
 @app.route('/')
 def index():
@@ -26,40 +30,39 @@ def translate():
         if not text:
             return jsonify({"translatedText": ""})
 
-        # --- 傳統 Google 模式 ---
+        # --- 傳統模式 ---
         if engine == 'google':
             lang_codes = {"日文": "ja", "英文": "en", "韓文": "ko", "法文": "fr"}
-            if mode == 'other':
-                t_code = "zh-TW"
-            else:
-                t_code = lang_codes.get(target_name, "en")
-            
+            t_code = "zh-TW" if mode == 'other' else lang_codes.get(target_name, "en")
             res = GoogleTranslator(source='auto', target=t_code).translate(text)
             return jsonify({"translatedText": res})
 
-        # --- AI Gemini 模式 ---
-        if not API_KEY:
-            return jsonify({"translatedText": "Error: GEMINI_API_KEY 未設定"}), 500
+        # --- AI 最新 2.0/3.0 模式 ---
+        client = get_client()
+        if not client:
+            return jsonify({"translatedText": "錯誤：API Key 未設定"}), 500
 
-        genai.configure(api_key=API_KEY)
-        # 使用最新的 flash 模型名稱
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 最新模型名稱：gemini-2.0-flash 或 gemini-1.5-flash
+        model_id = "gemini-1.5-flash"
         
         if mode == 'me':
-            prompt = f"將這段中文翻譯成{target_name}，只需回傳翻譯文字：'{text}'"
+            prompt = f"請將這段中文翻譯成{target_name}，只需回傳結果：'{text}'"
         else:
-            prompt = f"將這段{target_name}翻譯成繁體中文，只需回傳翻譯文字：'{text}'"
-            
-        response = model.generate_content(prompt)
-        
+            prompt = f"請將這段{target_name}翻譯成繁體中文，只需回傳結果：'{text}'"
+
+        # 最新版 API 呼叫方式
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt
+        )
+
         if response and response.text:
             return jsonify({"translatedText": response.text.strip()})
         else:
             return jsonify({"translatedText": "AI 回傳內容為空"}), 404
 
     except Exception as e:
-        # 這裡就是你原本報錯的地方，現在確保縮排正確
-        return jsonify({"translatedText": f"發生錯誤: {str(e)}"}), 500
+        return jsonify({"translatedText": f"最新 API 報錯: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8888))
