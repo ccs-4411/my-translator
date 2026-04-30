@@ -11,7 +11,7 @@ API_KEY = os.environ.get('GEMINI_API_KEY')
 if API_KEY:
     genai.configure(api_key=API_KEY)
     # 使用 2.0-flash 是目前最穩定的選擇
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     print("錯誤：找不到 GEMINI_API_KEY 環境變數")
 
