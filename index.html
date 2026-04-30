@@ -3,45 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 雙引擎翻譯官</title>
+    <title>AI 翻譯官</title>
     <style>
         :root { --primary: #4A90E2; --secondary: #34A853; }
-        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f8f9fa; padding: 10px; margin: 0; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .setup-box { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
-        select { padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; background: #fff; width: 100%; -webkit-appearance: none; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 10px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+        .setup-box { margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+        select { padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; width: 100%; outline: none; }
         .mode-selector { display: flex; gap: 10px; margin-bottom: 15px; }
-        .mode-btn { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
+        .mode-btn { flex: 1; padding: 12px; border: 2px solid #eee; border-radius: 15px; background: white; cursor: pointer; font-weight: bold; }
         .mode-btn.active { border-color: var(--primary); background: #eef6ff; color: var(--primary); }
-        .mode-btn.active-other { border-color: var(--secondary); background: #e6f4ea; color: var(--secondary); }
         #micBtn { 
-            background-color: var(--primary); color: white; border: none; padding: 25px; 
+            background: var(--primary); color: white; border: none; padding: 25px; 
             border-radius: 50%; font-size: 2.5rem; width: 100px; height: 100px; 
-            margin: 10px 0; box-shadow: 0 6px 20px rgba(74,144,226,0.3);
-            -webkit-tap-highlight-color: transparent; outline: none;
+            margin: 15px 0; box-shadow: 0 5px 15px rgba(74,144,226,0.3);
         }
-        #micBtn.recording { background-color: #ea4335; animation: pulse 1.5s infinite; }
+        #micBtn.recording { background: #ea4335; animation: pulse 1.2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        #result-box { margin-top: 15px; min-height: 120px; background: #fdfdfd; border-radius: 15px; padding: 15px; border: 1px solid #eee; }
-        #translated-text { font-size: 1.8rem; color: #333; margin: 10px 0; font-weight: bold; line-height: 1.3; }
-        #original-text { color: #888; font-size: 0.9rem; min-height: 1.2em; }
-        #status { color: var(--primary); font-weight: bold; font-size: 0.85rem; height: 1.5em; }
-        .play-btn { background: #f1f3f4; border: none; padding: 10px 25px; border-radius: 20px; cursor: pointer; font-size: 1rem; margin-top: 10px; font-weight: bold; }
+        #result-box { margin-top: 15px; padding: 15px; background: #fdfdfd; border-radius: 18px; border: 1px solid #eee; min-height: 100px; }
+        #translated-text { font-size: 1.8rem; font-weight: bold; color: #333; margin: 10px 0; }
+        #original-text { color: #999; font-size: 0.9rem; }
+        #status { color: var(--primary); font-size: 0.85rem; font-weight: bold; margin-bottom: 10px; min-height: 1.2em; }
+        .play-btn { background: #f1f3f4; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="status">檢查麥克風中...</div>
+        <div id="status">準備就緒</div>
         <div class="setup-box">
             <select id="engineSelect">
                 <option value="gemini">AI 模式 (Gemini 1.5)</option>
                 <option value="google">穩定模式 (Google Translate)</option>
             </select>
             <select id="targetLang" onchange="updateLabels()">
-                <option value="日文" data-code="ja">日文 🇯🇵</option>
-                <option value="英文" data-code="en">英文 🇺🇸</option>
-                <option value="韓文" data-code="ko">韓文 🇰🇷</option>
-                <option value="法文" data-code="fr">法文 🇫🇷</option>
+                <option value="日文" data-code="ja-JP">日文 🇯🇵</option>
+                <option value="英文" data-code="en-US">英文 🇺🇸</option>
+                <option value="韓文" data-code="ko-KR">韓文 🇰🇷</option>
+                <option value="法文" data-code="fr-FR">法文 🇫🇷</option>
             </select>
         </div>
         <div class="mode-selector">
@@ -50,7 +48,7 @@
         </div>
         <button id="micBtn">🎤</button>
         <div id="result-box">
-            <div id="original-text">請按下麥克風開始說話</div>
+            <div id="original-text">聽到的內容...</div>
             <div id="translated-text">...</div>
             <button class="play-btn" onclick="replayVoice()">🔊 重播聲音</button>
         </div>
@@ -68,35 +66,23 @@
         const targetSelect = document.getElementById('targetLang');
         const engineSelect = document.getElementById('engineSelect');
 
-        // 初始化語音辨識
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
 
-            recognition.onstart = () => { 
-                micBtn.classList.add('recording'); 
-                status.innerText = "正在聆聽中..."; 
-            };
-            
+            recognition.onstart = () => { micBtn.classList.add('recording'); status.innerText = "聆聽中..."; };
             recognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
-                originalDiv.innerText = "聽到的內容：" + text;
+                originalDiv.innerText = text;
                 processTranslation(text);
             };
-
-            recognition.onerror = (event) => {
+            recognition.onerror = (e) => { 
                 micBtn.classList.remove('recording');
-                if (event.error === 'no-speech') status.innerText = "沒聽到聲音，請再試一次";
-                else if (event.error === 'not-allowed') status.innerText = "請開啟麥克風權限";
-                else status.innerText = "辨識失敗: " + event.error;
+                status.innerText = "聽不清楚，請重新再試";
             };
-
             recognition.onend = () => { micBtn.classList.remove('recording'); };
-            status.innerText = "準備就緒";
-        } else {
-            status.innerText = "此瀏覽器不支援語音辨識";
         }
 
         function updateLabels() {
@@ -108,52 +94,29 @@
             currentDir = dir;
             const selectedOption = targetSelect.options[targetSelect.selectedIndex];
             document.getElementById('btn-me').classList.toggle('active', dir === 'me');
-            document.getElementById('btn-other').classList.toggle('active-other', dir === 'other');
-            
-            const lang = selectedOption.getAttribute('data-code');
-            // 設定辨識語系
-            if (dir === 'me') {
-                recognition.lang = 'zh-TW';
-                micBtn.style.backgroundColor = "#4A90E2";
-            } else {
-                recognition.lang = (lang === 'en' ? 'en-US' : (lang === 'ja' ? 'ja-JP' : (lang === 'ko' ? 'ko-KR' : 'fr-FR')));
-                micBtn.style.backgroundColor = "#34A853";
-            }
+            document.getElementById('btn-other').classList.toggle('active', dir === 'other');
+            recognition.lang = (dir === 'me') ? 'zh-TW' : selectedOption.getAttribute('data-code');
+            micBtn.style.backgroundColor = (dir === 'me') ? "#4A90E2" : "#34A853";
         }
 
         function speak(text, langCode) {
             if (!text || text === "...") return;
             window.speechSynthesis.cancel();
             const utter = new SpeechSynthesisUtterance(text);
-            
-            // 語音播放代碼修正規整
-            const map = { 'ja': 'ja-JP', 'en': 'en-US', 'ko': 'ko-KR', 'fr': 'fr-FR', 'zh-TW': 'zh-TW' };
-            utter.lang = map[langCode] || langCode;
+            utter.lang = langCode;
             utter.rate = 1.0;
             window.speechSynthesis.speak(utter);
         }
 
         micBtn.onclick = () => {
-            // 先停止說話，避免干擾
             window.speechSynthesis.cancel();
-            
-            // 喚醒 iOS 語音
             window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-
-            if (micBtn.classList.contains('recording')) {
-                recognition.stop();
-            } else {
-                try {
-                    recognition.start();
-                } catch (e) {
-                    recognition.stop();
-                    setTimeout(() => recognition.start(), 200);
-                }
-            }
+            if (micBtn.classList.contains('recording')) recognition.stop();
+            else recognition.start();
         };
 
         async function processTranslation(text) {
-            status.innerText = "正在翻譯...";
+            status.innerText = "翻譯中...";
             const selectedOption = targetSelect.options[targetSelect.selectedIndex];
             const target = (currentDir === 'me') ? selectedOption.value : "中文";
             const voiceLang = (currentDir === 'me') ? selectedOption.getAttribute('data-code') : "zh-TW";
@@ -168,10 +131,10 @@
                 const data = await response.json();
                 lastTranslatedText = data.translatedText;
                 translatedDiv.innerText = lastTranslatedText;
-                status.innerText = "翻譯完成 (" + (engine === 'gemini' ? "AI" : "穩定") + ")";
+                status.innerText = "完成";
                 speak(lastTranslatedText, voiceLang);
             } catch (err) {
-                status.innerText = "連線失敗，請檢查網路";
+                status.innerText = "連線失敗";
             }
         }
 
