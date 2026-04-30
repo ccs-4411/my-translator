@@ -8,43 +8,33 @@
         :root { --primary: #4A90E2; --secondary: #34A853; }
         body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f8f9fa; padding: 10px; margin: 0; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        
         .setup-box { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
-        select { padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; background: #fff; width: 100%; }
-
+        select { padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; background: #fff; width: 100%; -webkit-appearance: none; }
         .mode-selector { display: flex; gap: 10px; margin-bottom: 15px; }
-        .mode-btn { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 0.9rem; }
+        .mode-btn { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
         .mode-btn.active { border-color: var(--primary); background: #eef6ff; color: var(--primary); }
-
         #micBtn { 
             background-color: var(--primary); color: white; border: none; padding: 25px; 
-            border-radius: 50%; font-size: 2.5rem; cursor: pointer; width: 100px; height: 100px; 
+            border-radius: 50%; font-size: 2.5rem; width: 100px; height: 100px; 
             margin: 10px 0; box-shadow: 0 6px 20px rgba(74,144,226,0.3);
-            -webkit-tap-highlight-color: transparent;
         }
         #micBtn.recording { background-color: #ea4335; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
         #result-box { margin-top: 15px; min-height: 120px; background: #fdfdfd; border-radius: 15px; padding: 10px; }
-        #translated-text { font-size: 2rem; color: #333; margin: 10px 0; font-weight: bold; line-height: 1.2; word-break: break-all; }
-        #original-text { color: #888; font-size: 0.9rem; font-style: italic; }
-        #status { color: var(--primary); font-weight: bold; margin-bottom: 5px; font-size: 0.85rem; height: 1.2em; }
-        
-        .play-btn { background: #f1f3f4; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; margin-top: 10px; }
+        #translated-text { font-size: 1.8rem; color: #333; margin: 10px 0; font-weight: bold; line-height: 1.3; }
+        #original-text { color: #888; font-size: 0.9rem; min-height: 1.2em; }
+        #status { color: var(--primary); font-weight: bold; font-size: 0.85rem; height: 1.5em; }
+        .play-btn { background: #f1f3f4; border: none; padding: 10px 25px; border-radius: 20px; cursor: pointer; font-size: 1rem; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="status">準備就緒</div>
-
         <div class="setup-box">
-            <label style="font-size: 0.8rem; font-weight: bold;">翻譯引擎：</label>
             <select id="engineSelect">
                 <option value="gemini">AI 模式 (Gemini 1.5 Flash)</option>
                 <option value="google">穩定模式 (Google Translate)</option>
             </select>
-
-            <label style="font-size: 0.8rem; font-weight: bold;">目標語系：</label>
             <select id="targetLang" onchange="updateLabels()">
                 <option value="日文" data-code="ja-JP">日文 🇯🇵</option>
                 <option value="英文" data-code="en-US">英文 🇺🇸</option>
@@ -52,18 +42,15 @@
                 <option value="法文" data-code="fr-FR">法文 🇫🇷</option>
             </select>
         </div>
-
         <div class="mode-selector">
             <button id="btn-me" class="mode-btn active" onclick="setDirection('me')">我講中文<br>➔ <span class="lang-label">日文</span></button>
             <button id="btn-other" class="mode-btn" onclick="setDirection('other')">對方講<span class="lang-label">日文</span><br>➔ 中文</button>
         </div>
-
         <button id="micBtn">🎤</button>
-        
         <div id="result-box">
             <div id="original-text">等待語音...</div>
             <div id="translated-text">...</div>
-            <button class="play-btn" onclick="replayVoice()">🔊 重播</button>
+            <button class="play-btn" onclick="replayVoice()">🔊 重播聲音</button>
         </div>
     </div>
 
@@ -88,37 +75,41 @@
             recognition.onstart = () => { micBtn.classList.add('recording'); status.innerText = "正在聆聽..."; };
             recognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
-                originalDiv.innerText = "偵測到：" + text;
+                originalDiv.innerText = "偵測：" + text;
                 processTranslation(text);
             };
-            recognition.onerror = (e) => { 
-                status.innerText = "請再試一次"; 
-                micBtn.classList.remove('recording'); 
-            };
+            recognition.onerror = () => { status.innerText = "沒聽清楚，請再試一次"; micBtn.classList.remove('recording'); };
             recognition.onend = () => { micBtn.classList.remove('recording'); };
         }
 
         function updateLabels() {
-            const langName = targetSelect.value;
-            document.querySelectorAll('.lang-label').forEach(el => el.innerText = langName);
+            document.querySelectorAll('.lang-label').forEach(el => el.innerText = targetSelect.value);
             setDirection(currentDir);
         }
 
         function setDirection(dir) {
             currentDir = dir;
             const selectedOption = targetSelect.options[targetSelect.selectedIndex];
-            const otherLangCode = selectedOption.getAttribute('data-code');
-
             document.getElementById('btn-me').classList.toggle('active', dir === 'me');
             document.getElementById('btn-other').classList.toggle('active', dir === 'other');
-            
-            recognition.lang = (dir === 'me') ? 'zh-TW' : otherLangCode;
+            recognition.lang = (dir === 'me') ? 'zh-TW' : selectedOption.getAttribute('data-code');
             micBtn.style.backgroundColor = (dir === 'me') ? "#4A90E2" : "#34A853";
-            status.innerText = "已切換方向";
+        }
+
+        function speak(text, langCode) {
+            if (!text || text === "...") return;
+            window.speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = langCode;
+            utter.rate = 1.0;
+            window.speechSynthesis.speak(utter);
         }
 
         micBtn.onclick = () => {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 喚醒手機語音
+            // 重要：點擊按鈕時先啟動一個無聲播放，喚醒手機語音引擎
+            const wakeUp = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(wakeUp);
+            
             if (micBtn.classList.contains('recording')) recognition.stop();
             else recognition.start();
         };
@@ -137,26 +128,16 @@
                     body: JSON.stringify({ text, target, engine })
                 });
                 const data = await response.json();
-                lastTranslatedText = data.translatedText || data.error;
+                lastTranslatedText = data.translatedText;
                 translatedDiv.innerText = lastTranslatedText;
-                status.innerText = (engine === 'gemini' ? "AI 翻譯完成" : "Google 翻譯完成");
-                
+                status.innerText = "翻譯完成 (" + (engine === 'gemini' ? "AI" : "Google") + ")";
                 speak(lastTranslatedText, voiceLang);
             } catch (err) {
-                status.innerText = "連線失敗";
+                status.innerText = "伺服器忙碌中";
             }
         }
 
-        function speak(text, langCode) {
-            window.speechSynthesis.cancel();
-            const utter = new SpeechSynthesisUtterance(text);
-            utter.lang = langCode;
-            utter.rate = 0.95;
-            window.speechSynthesis.speak(utter);
-        }
-
         function replayVoice() {
-            if (!lastTranslatedText) return;
             const selectedOption = targetSelect.options[targetSelect.selectedIndex];
             const voiceLang = (currentDir === 'me') ? selectedOption.getAttribute('data-code') : "zh-TW";
             speak(lastTranslatedText, voiceLang);
