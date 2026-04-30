@@ -34,7 +34,7 @@ def translate():
             return jsonify({"translatedText": ""})
 
         # 關鍵修正：確保使用 gemini-1.5-flash，這是目前在雲端環境最穩的模型
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"你是一個專業翻譯。請將以下內容翻譯成{target}，只要翻譯後的結果：'{text}'"
         
