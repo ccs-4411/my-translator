@@ -7,6 +7,7 @@ from deep_translator import GoogleTranslator
 app = Flask(__name__)
 CORS(app)
 
+# 取得 API Key
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 @app.route('/')
@@ -22,47 +23,47 @@ def translate():
         engine = data.get('engine', 'gemini')
         mode = data.get('mode', 'me')
 
+        if not text:
+            return jsonify({"translatedText": ""})
+
+        # --- 傳統 Google 模式 ---
         if engine == 'google':
-            t_code = "zh-TW" if mode == 'other' else {"英文":"en","日文":"ja","韓文":"ko","法文":"fr"}.get(target_name, "en")
+            lang_codes = {"日文": "ja", "英文": "en", "韓文": "ko", "法文": "fr"}
+            if mode == 'other':
+                t_code = "zh-TW"
+            else:
+                t_code = lang_codes.get(target_name, "en")
+            
             res = GoogleTranslator(source='auto', target=t_code).translate(text)
             return jsonify({"translatedText": res})
 
-        # --- AI 模式：帶有模型排錯機制 ---
+        # --- AI Gemini 模式 ---
         if not API_KEY:
-            return jsonify({"translatedText": "Error: Render 環境變數未設定"}), 500
+            return jsonify({"translatedText": "Error: GEMINI_API_KEY 未設定"}), 500
 
         genai.configure(api_key=API_KEY)
+        # 使用最新的 flash 模型名稱
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # 嘗試模型列表（由新到舊）
-        model_names = ['models/gemini-1.5-flash', 'gemini-1.5-flash', 'gemini-pro']
+        if mode == 'me':
+            prompt = f"將這段中文翻譯成{target_name}，只需回傳翻譯文字：'{text}'"
+        else:
+            prompt = f"將這段{target_name}翻譯成繁體中文，只需回傳翻譯文字：'{text}'"
+            
+        response = model.generate_content(prompt)
         
-        success = False
-        last_exception = ""
-        
-        for m_name in model_names:
-            try:
-                model = genai.GenerativeModel(m_name)
-                prompt = f"Translate to {target_name}: '{text}'" if mode == 'me' else f"Translate to Traditional Chinese: '{text}'"
-                resp = model.generate_content(prompt)
-                return jsonify({"translatedText": resp.text.strip()})
-            except Exception as e:
-                last_exception = str(e)
-                continue
-        
-        # 如果走到這裡，代表所有模型都失敗，回傳伺服器目前的清單供除錯
-        available_models = [m.name for m in genai.list_models()]
-        return jsonify({
-            "translatedText": f"模型找不到。報錯: {last_exception}。伺服器目前可用模型: {available_models}"
-        }), 404
+        if response and response.text:
+            return jsonify({"translatedText": response.text.strip()})
+        else:
+            return jsonify({"translatedText": "AI 回傳內容為空"}), 404
 
     except Exception as e:
-        return jsonify({"translatedText": f"系統錯誤: {str(e)}"}), 500
+        # 這裡就是你原本報錯的地方，現在確保縮排正確
+        return jsonify({"translatedText": f"發生錯誤: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8888)))
-
-    except Exception as e:
-        return jsonify({"translatedText": f"錯誤: {str(e)}"}), 500
+    port = int(os.environ.get('PORT', 8888))
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8888)))
