@@ -3,35 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 多國雙向翻譯</title>
+    <title>AI 雙向翻譯機</title>
     <style>
         :root { --primary: #4A90E2; --secondary: #34A853; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; background-color: #f0f2f5; padding: 15px; margin: 0; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f0f2f5; padding: 15px; margin: 0; }
         .container { max-width: 500px; margin: 20px auto; background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .setup-box { margin-bottom: 20px; text-align: left; background: #f8f9fa; padding: 15px; border-radius: 15px; }
         select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; margin-top: 5px; }
         .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; }
-        .mode-btn { flex: 1; padding: 15px 10px; border: 3px solid #eee; border-radius: 15px; background: white; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 0.95rem; }
+        .mode-btn { flex: 1; padding: 15px 10px; border: 3px solid #eee; border-radius: 15px; background: white; cursor: pointer; font-weight: bold; font-size: 0.95rem; }
         .mode-btn.active { border-color: var(--primary); background: #eef6ff; color: var(--primary); }
         .mode-btn.other-active { border-color: var(--secondary); background: #e6f4ea; color: var(--secondary); }
         #micBtn { 
             background-color: var(--primary); color: white; border: none; padding: 25px; 
             border-radius: 50%; font-size: 3rem; cursor: pointer; width: 110px; height: 110px; 
-            margin: 20px 0; box-shadow: 0 8px 25px rgba(74,144,226,0.4); outline: none;
+            margin: 20px 0; box-shadow: 0 8px 25px rgba(74,144,226,0.4); 
         }
         #micBtn.recording { background-color: #ea4335; animation: pulse 1.2s infinite; }
+        #micBtn:disabled { background-color: #ccc; cursor: not-allowed; box-shadow: none; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        #translated-text { font-size: 2.2rem; color: #222; margin: 20px 0; font-weight: 800; line-height: 1.3; min-height: 3rem; }
+        #translated-text { font-size: 2.2rem; color: #222; margin: 20px 0; font-weight: 800; line-height: 1.3; }
         #original-text { color: #777; font-size: 1.1rem; min-height: 1.5rem; }
-        #status { color: #999; font-size: 0.9rem; margin-bottom: 5px; }
-        .play-btn { background: #eee; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-weight: bold; color: #555; }
+        #status { color: #999; font-size: 0.9rem; margin-bottom: 5px; font-weight: bold; }
+        .play-btn { background: #eee; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="status">系統準備就緒</div>
         <div class="setup-box">
-            <label>選擇翻譯目標語言：</label>
+            <label>目標語言：</label>
             <select id="targetLang" onchange="updateLabels()">
                 <option value="日文" data-code="ja-JP">日文 🇯🇵</option>
                 <option value="英文" data-code="en-US">英文 🇺🇸</option>
@@ -44,13 +45,13 @@
             <button id="btn-other" class="mode-btn" onclick="setDir('other')">對方說<span class="lt">日文</span><br>➔ 中文</button>
         </div>
         <button id="micBtn">🎤</button>
-        <div id="original-text">等待語音輸入...</div>
+        <div id="original-text">等待語音...</div>
         <div id="translated-text">...</div>
-        <button class="play-btn" onclick="replay()">🔊 重播聲音</button>
+        <button class="play-btn" onclick="replay()">🔊 重播</button>
     </div>
 
     <script>
-        let dir = 'me', lastText = "", recognition;
+        let dir = 'me', lastText = "", recognition, isPlaying = false;
         const micBtn = document.getElementById('micBtn'), status = document.getElementById('status'),
               tDiv = document.getElementById('translated-text'), oDiv = document.getElementById('original-text'),
               tSel = document.getElementById('targetLang');
@@ -58,19 +59,13 @@
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-
             recognition.onstart = () => { micBtn.classList.add('recording'); status.innerText = "聆聽中..."; };
             recognition.onresult = (e) => {
                 const text = e.results[0][0].transcript;
-                oDiv.innerText = "偵測到：" + text;
+                oDiv.innerText = "偵測：" + text;
                 doTrans(text);
             };
-            recognition.onend = () => { micBtn.classList.remove('recording'); status.innerText = "處理中..."; };
-            recognition.onerror = (e) => { status.innerText = "語音辨識錯誤: " + e.error; micBtn.classList.remove('recording'); };
-        } else {
-            status.innerText = "您的瀏覽器不支援語音辨識";
+            recognition.onend = () => { micBtn.classList.remove('recording'); };
         }
 
         function updateLabels() {
@@ -87,13 +82,13 @@
         }
 
         micBtn.onclick = () => {
-            // 點擊瞬間喚醒 iOS 音訊
-            const s = new SpeechSynthesisUtterance("");
-            window.speechSynthesis.speak(s);
+            if (isPlaying) return; // 播放中禁止錄音
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 喚醒 iOS
             try { recognition.start(); } catch(e) { recognition.stop(); }
         };
 
         async function doTrans(text) {
+            status.innerText = "翻譯中...";
             const opt = tSel.options[tSel.selectedIndex];
             const target = (dir === 'me') ? opt.value : "中文";
             const vLang = (dir === 'me') ? opt.getAttribute('data-code') : "zh-TW";
@@ -106,23 +101,24 @@
                 const data = await res.json();
                 lastText = data.translatedText;
                 tDiv.innerText = lastText;
-                status.innerText = "準備就緒";
+                status.innerText = "完成";
                 speak(lastText, vLang);
-            } catch (err) { status.innerText = "翻譯伺服器連線失敗"; }
+            } catch (err) { status.innerText = "錯誤，請稍後再試"; }
         }
 
         function speak(t, l) {
             window.speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(t);
-            u.lang = l;
-            u.rate = 0.9;
+            u.lang = l; u.rate = 0.9;
+            
+            // 播放時鎖定按鈕，防止錄到自己的聲音
+            u.onstart = () => { isPlaying = true; micBtn.disabled = true; status.innerText = "播放中..."; };
+            u.onend = () => { isPlaying = false; micBtn.disabled = false; status.innerText = "準備就緒"; };
+            
             window.speechSynthesis.speak(u);
         }
 
-        function replay() { 
-            if(lastText) speak(lastText, (dir==='me'?tSel.options[tSel.selectedIndex].getAttribute('data-code'):'zh-TW')); 
-        }
-        
+        function replay() { if(lastText) speak(lastText, (dir==='me'?tSel.options[tSel.selectedIndex].getAttribute('data-code'):'zh-TW')); }
         updateLabels();
     </script>
 </body>
