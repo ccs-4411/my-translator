@@ -6,38 +6,37 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# 1. 解決 PythonAnywhere 免費版連線限制 (一定要加)
-os.environ['http_proxy'] = "http://proxy.server:3128"
-os.environ['https_proxy'] = "http://proxy.server:3128"
+# 確保抓到正確的檔案路徑
+base_dir = os.path.abspath(os.path.dirname(__file__))
 
-# 2. 設定 API Key (從環境變數讀取，或直接貼在這裡也可以)
-# 建議確保在 Web 頁面的 WSGI 檔案裡有設定過這個環境變數
-api_key = os.environ.get('GEMINI_API_KEY')
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-2.5-flash')
+api_key = os.environ.get("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+
+# 使用 1.5-flash 在 Render 環境最穩定
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route('/')
 def index():
-    # 確保 index.html 跟 app.py 在同一個目錄
-    return send_from_directory('.', 'index.html')
+    # 修正：使用絕對路徑指向 index.html
+    return send_from_directory(base_dir, 'index.html')
 
 @app.route('/translate', methods=['POST'])
 def translate():
     try:
         data = request.json
-        target_lang = data.get('target', '日文')
-        text = data.get('text', '')
-
-        if not text:
-            return jsonify({"error": "沒有輸入文字"}), 400
-
-        prompt = f"將以下中文翻譯成道地的 {target_lang} 口語，只需要給我翻譯後的結果： '{text}'"
+        text = data.get('text')
+        target_lang = data.get('target')
+        
+        prompt = f"你是一位專業的旅行翻譯官。請將以下內容翻譯成道地的 {target_lang} 口語，只需要回傳翻譯結果，不要有任何解釋。內容： '{text}'"
+        
         response = model.generate_content(prompt)
-
         return jsonify({"translatedText": response.text.strip()})
     except Exception as e:
-        # 如果出錯，會回傳具體的錯誤訊息給手機
+        print(f"Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 關鍵：Render 必須使用環境變數中的 PORT，且 host 必須是 0.0.0.0
+    port = int(os.environ.get('PORT', 8888))
+    app.run(host='0.0.0.0', port=port)
