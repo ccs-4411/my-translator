@@ -45,9 +45,8 @@ def translate():
             translated = GoogleTranslator(source='auto', target=target_code).translate(text)
             return jsonify({"translatedText": translated})
 
-        # --- 引擎 B: Gemini AI 翻譯 (具備自動修正路徑功能) ---
+        # --- 引擎 B: Gemini AI 翻譯 (具備自動路徑修復) ---
         else:
-            # 嘗試多種可能的路徑名稱，解決不同伺服器環境下的 404 問題
             model_names = [
                 'models/gemini-1.5-flash-latest',
                 'models/gemini-1.5-flash',
@@ -59,7 +58,7 @@ def translate():
             for name in model_names:
                 try:
                     model = genai.GenerativeModel(name)
-                    prompt = f"你是一位翻譯官。請將內容翻譯成道地的 {target_lang_name} 口語，只要翻譯結果：'{text}'"
+                    prompt = f"你是一位專業翻譯。請將內容翻譯成道地的 {target_lang_name} 口語，只需要翻譯結果：'{text}'"
                     response = model.generate_content(prompt)
                     
                     if hasattr(response, 'text'):
@@ -69,13 +68,11 @@ def translate():
                         return jsonify({"translatedText": res})
                 except Exception as e:
                     last_err = str(e)
-                    continue # 失敗則嘗試下一個模型名稱
+                    continue 
             
-            # 如果全部嘗試都失敗
-            return jsonify({"translatedText": f"AI 模式暫時失效: {last_err}"}), 404
+            return jsonify({"translatedText": f"AI 暫時失效，請切換穩定模式 (404 Error)"}), 404
 
     except Exception as e:
-        print(f"Error: {str(e)}")
         return jsonify({"translatedText": f"伺服器錯誤: {str(e)}"}), 500
 
 if __name__ == '__main__':
