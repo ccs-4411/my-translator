@@ -3,63 +3,71 @@ import traceback
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import google.generativeai as genai
-
-# 強制獲取絕對路徑，解決 Render 找不到 index.html 的問題
-base_dir = os.path.abspath(os.path.dirname(__file__))
+# 使用 deep-translator 作為傳統 Google 翻譯的穩定方案
+from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
 CORS(app)
 
-# 1. 設定 API KEY
-API_KEY = os.environ.get('GEMINI_API_KEY')
+# 獲取絕對路徑
+base_dir = os.path.abspath(os.path.dirname(__file__))
+
+# 1. Gemini 設定
+API_KEY = os.environ.get("GEMINI_API_KEY")
 if API_KEY:
     genai.configure(api_key=API_KEY)
-else:
-    print("錯誤：找不到 GEMINI_API_KEY")
+# 使用你在 Render 測試成功的最新穩定版模型名稱
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
-# 2. 路由：首頁
+# 語言對照表 (針對傳統翻譯引擎)
+LANG_MAP = {
+    "日文": "ja",
+    "英文": "en",
+    "韓文": "ko",
+    "法文": "fr",
+    "中文": "zh-TW"
+}
+
 @app.route('/')
 def index():
     return send_from_directory(base_dir, 'index.html')
 
-# 3. 翻譯邏輯 (加入穩定版 v1 修正)
 @app.route('/translate', methods=['POST'])
 def translate():
     try:
         data = request.json
-        target = data.get('target', '中文')
         text = data.get('text', '')
+        target_lang_name = data.get('target', '中文')
+        engine = data.get('engine', 'gemini')
 
         if not text:
             return jsonify({"translatedText": ""})
 
-        # 關鍵修正：確保使用 gemini-1.5-flash，這是目前在雲端環境最穩的模型
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        
-        prompt = f"你是一個專業翻譯。請將以下內容翻譯成{target}，只要翻譯後的結果：'{text}'"
-        
-        # 呼叫 API
-        response = model.generate_content(prompt)
-        
-        # 檢查並解析回傳
-        if hasattr(response, 'text'):
-            result = response.text.strip()
-        else:
-            result = response.candidates[0].content.parts[0].text.strip()
+        # --- 引擎 A: Google 傳統翻譯 ---
+        if engine == 'google':
+            target_code = LANG_MAP.get(target_lang_name, "en")
+            translated = GoogleTranslator(source='auto', target=target_code).translate(text)
+            return jsonify({"translatedText": translated})
 
-        return jsonify({"translatedText": result})
+        # --- 引擎 B: Gemini AI 翻譯 ---
+        else:
+            prompt = f"你是一位專業翻譯官。請將內容翻譯成道地的 {target_lang_name} 口語，只要結果，不要解釋：'{text}'"
+            response = model.generate_content(prompt)
+            
+            if hasattr(response, 'text'):
+                result = response.text.strip()
+            else:
+                result = response.candidates[0].content.parts[0].text.strip()
+            
+            return jsonify({"translatedText": result})
 
     except Exception as e:
-        error_msg = str(e)
-        print("======== API 報錯詳情 ========")
+        print("======== 翻譯出錯 ========")
         traceback.print_exc()
-        
-        # 如果發生 404，給予明確提示
-        if "404" in error_msg:
-            return jsonify({"translatedText": "模型路徑錯誤 (404)。請確認 Render 的 Region 設為 Singapore 且使用 1.5 模型。"}), 404
-        return jsonify({"translatedText": f"錯誤: {error_msg}"}), 500
+        return jsonify({"translatedText": f"錯誤: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # 重要：Render 必須使用 0.0.0.0
+    # Render 環境必須使用 0.0.0.0
     port = int(os.environ.get('PORT', 8888))
+    app.run(host='0.0.0.0', port=port)
     app.run(host='0.0.0.0', port=port)
