@@ -1,4 +1,5 @@
 import os
+import traceback
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import google.generativeai as genai
@@ -6,14 +7,12 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# 設定 Gemini API (支援 2.0/2.5 Key)
+# 設定 Gemini API
 API_KEY = os.environ.get('GEMINI_API_KEY')
 if API_KEY:
     genai.configure(api_key=API_KEY)
-    # 使用 2.0-flash 是目前最穩定的選擇
-    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
-    print("錯誤：找不到 GEMINI_API_KEY 環境變數")
+    print("!!! 警告：環境變數 GEMINI_API_KEY 未設定 !!!")
 
 @app.route('/')
 def index():
@@ -26,32 +25,39 @@ def translate():
         target = data.get('target', '中文')
         text = data.get('text', '')
         
-        if not text or len(text.strip()) < 1:
+        if not text:
             return jsonify({"translatedText": ""})
 
-        # 嚴格指令，避免 AI 廢話過多
-        prompt = f"你是一個專業翻譯。請將以下內容翻譯成{target}，只要給我翻譯後的結果，不要有任何多餘解釋：'{text}'"
+        # 優先嘗試 2.0，若失敗會被下面 except 捕捉
+        model_name = 'gemini-2.0-flash'
+        print(f"嘗試使用 {model_name} 翻譯: {text[:10]}...")
+        
+        model = genai.GenerativeModel(model_name)
+        prompt = f"你是一個專業翻譯。請將以下內容翻譯成{target}，只要給我結果，不要有解釋：'{text}'"
         
         response = model.generate_content(prompt)
         
-        # 解析 Response
+        # 解析回傳結果
         if hasattr(response, 'text'):
             result = response.text.strip()
         elif response.candidates:
             result = response.candidates[0].content.parts[0].text.strip()
         else:
-            result = "翻譯未生成"
+            result = "AI 未生成結果"
 
-        print(f"成功: {text} -> {result}")
         return jsonify({"translatedText": result})
 
     except Exception as e:
+        # --- 關鍵除錯：這段會把真正的錯誤原因印在 Render Logs ---
+        print("======== API ERROR LOG START ========")
+        traceback.print_exc() 
         error_msg = str(e)
-        # 如果發生 429 錯誤，回傳友善提示
+        print("========= API ERROR LOG END =========")
+        
+        # 如果是 429 或者是模型不存在，建議使用者檢查 Key
         if "429" in error_msg:
-            return jsonify({"translatedText": "系統忙碌中 (429)，請稍等 10 秒再試"}), 429
-        print(f"錯誤: {error_msg}")
-        return jsonify({"translatedText": f"錯誤: {error_msg}"}), 500
+            return jsonify({"translatedText": "API 權限限制 (429)。請檢查 API Key 是否有效或更換新 Key。"}), 429
+        return jsonify({"translatedText": f"系統錯誤: {error_msg}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
