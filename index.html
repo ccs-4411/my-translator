@@ -3,77 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 翻譯官</title>
+    <title>AI 雙向翻譯官</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
-        .box { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        select, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; }
-        #micBtn { height: 80px; width: 80px; border-radius: 50%; font-size: 2rem; background: #4A90E2; color: white; border: none; cursor: pointer; }
-        #micBtn.active { background: #e74c3c; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .result { margin-top: 20px; font-weight: bold; font-size: 1.5rem; color: #333; min-height: 50px; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 15px; }
+        .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; }
+        .btn-group { display: flex; gap: 15px; justify-content: center; margin: 20px 0; }
+        .mic-btn { flex: 1; height: 100px; border-radius: 20px; border: none; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; transition: 0.3s; }
+        #btn-me { background: #4A90E2; }
+        #btn-other { background: #34A853; }
+        .mic-btn.active { background: #ff4757 !important; animation: pulse 1.2s infinite; }
+        .mic-icon { font-size: 2rem; margin-bottom: 5px; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #result-box { background: #fdfdfd; border-radius: 15px; padding: 15px; border: 1px solid #eee; margin-top: 15px; min-height: 120px; }
+        #translated { font-size: 1.8rem; font-weight: bold; color: #333; margin: 10px 0; }
+        #original { color: #999; font-size: 0.9rem; }
+        #status { font-size: 0.8rem; color: #4A90E2; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <div id="status" style="font-size:0.8rem; color: #666;">系統就緒</div>
-        <select id="engine"><option value="gemini">AI 模式</option><option value="google">傳統模式</option></select>
-        <select id="target"><option value="英文">英文 🇺🇸</option><option value="日文">日文 🇯🇵</option></select>
-        <button id="micBtn">🎤</button>
-        <div id="origin" style="color:#999; font-size:0.9rem; margin-top:10px;">聽到的文字...</div>
-        <div id="result" class="result">...</div>
+    <div class="card">
+        <div id="status">準備就緒</div>
+        <select id="engine">
+            <option value="gemini">AI 智慧模式</option>
+            <option value="google">傳統穩定模式</option>
+        </select>
+        <select id="target" onchange="updateUI()">
+            <option value="英文" data-v="en-US">英文 🇺🇸</option>
+            <option value="日文" data-v="ja-JP">日文 🇯🇵</option>
+            <option value="韓文" data-v="ko-KR">韓文 🇰🇷</option>
+            <option value="法文" data-v="fr-FR">法文 🇫🇷</option>
+        </select>
+
+        <div class="btn-group">
+            <button id="btn-me" class="mic-btn" onclick="startRecognition('me')">
+                <span class="mic-icon">🎤</span>
+                <span>我講中文</span>
+            </button>
+            <button id="btn-other" class="mic-btn" onclick="startRecognition('other')">
+                <span class="mic-icon">🎧</span>
+                <span>對方講<span class="lang-text">英文</span></span>
+            </button>
+        </div>
+
+        <div id="result-box">
+            <div id="original">請按按鈕開始...</div>
+            <div id="translated">...</div>
+        </div>
     </div>
 
     <script>
-        const micBtn = document.getElementById('micBtn');
-        const targetSel = document.getElementById('target');
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'zh-TW';
+        let currentMode = 'me';
+        let lastResult = "";
 
-        recognition.onstart = () => micBtn.classList.add('active');
-        recognition.onend = () => micBtn.classList.remove('active');
-        recognition.onresult = (e) => {
+        function updateUI() {
+            document.querySelectorAll('.lang-text').forEach(el => el.innerText = document.getElementById('target').value);
+        }
+
+        recognition.onstart = () => {
+            const btnId = currentMode === 'me' ? 'btn-me' : 'btn-other';
+            document.getElementById(btnId).classList.add('active');
+            document.getElementById('status').innerText = "正在聆聽中...";
+        };
+
+        recognition.onend = () => {
+            document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
+        };
+
+        recognition.onresult = async (e) => {
             const text = e.results[0][0].transcript;
-            document.getElementById('origin').innerText = text;
+            document.getElementById('original').innerText = text;
             doTranslate(text);
         };
 
         async function doTranslate(text) {
-            document.getElementById('status').innerText = "處理中...";
-            const res = await fetch('/translate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({text, target: targetSel.value, engine: document.getElementById('engine').value})
-            });
-            const data = await res.json();
-            const out = data.translatedText;
-            document.getElementById('result').innerText = out;
-            document.getElementById('status').innerText = "完成";
-            
-            // 修正：針對不同語系強迫指定發音代碼
-            let voiceCode = 'en-US';
-            if(targetSel.value === '日文') voiceCode = 'ja-JP';
-            
-            speak(out, voiceCode);
+            document.getElementById('status').innerText = "翻譯中...";
+            const target = document.getElementById('target');
+            const engine = document.getElementById('engine').value;
+
+            try {
+                const res = await fetch('/translate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text, target: target.value, engine, mode: currentMode })
+                });
+                const data = await res.json();
+                lastResult = data.translatedText;
+                document.getElementById('translated').innerText = lastResult;
+                document.getElementById('status').innerText = "翻譯完成";
+
+                // 發音邏輯：我講中文 -> 播外語；對方講外語 -> 播中文
+                const voiceCode = currentMode === 'me' ? target.options[target.selectedIndex].getAttribute('data-v') : 'zh-TW';
+                speak(lastResult, voiceCode);
+            } catch (err) {
+                document.getElementById('status').innerText = "連線失敗";
+            }
         }
 
         function speak(text, code) {
             window.speechSynthesis.cancel();
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = code;
-            // 英文如果沒聲音，嘗試強制指定給系統中第一個英文人聲
-            const voices = window.speechSynthesis.getVoices();
-            if(code.includes('en')) {
-                const enVoice = voices.find(v => v.lang.startsWith('en'));
-                if(enVoice) msg.voice = enVoice;
-            }
+            // 解決 iOS 英文沒聲音的加強：
+            if(code.startsWith('en')) msg.rate = 0.9; 
             window.speechSynthesis.speak(msg);
         }
 
-        micBtn.onclick = () => {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 喚醒手機語音
+        function startRecognition(mode) {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 預熱 iOS
+            currentMode = mode;
+            const target = document.getElementById('target');
+            // 設定聽什麼語言
+            recognition.lang = (mode === 'me') ? 'zh-TW' : target.options[target.selectedIndex].getAttribute('data-v');
             recognition.start();
-        };
+        }
+        
+        updateUI();
     </script>
 </body>
 </html>
