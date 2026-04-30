@@ -3,104 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 雙向翻譯機 (V3)</title>
+    <title>AI 多國翻譯官</title>
     <style>
         :root { --primary: #4A90E2; --secondary: #34A853; }
-        body { font-family: -apple-system, sans-serif; text-align: center; background: #f0f2f5; padding: 15px; margin: 0; }
-        .container { max-width: 500px; margin: 10px auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .mode-selector { display: flex; gap: 8px; margin-bottom: 15px; }
-        .mode-btn { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; font-weight: bold; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background-color: #f8f9fa; padding: 15px; margin: 0; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        
+        .setup-box { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        select { padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 1rem; background: #fff; }
+
+        .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .mode-btn { flex: 1; padding: 15px; border: 2px solid #ddd; border-radius: 12px; background: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .mode-btn.active { border-color: var(--primary); background: #eef6ff; color: var(--primary); }
-        .mode-btn.other-active { border-color: var(--secondary); background: #e6f4ea; color: var(--secondary); }
-        select { width: 100%; padding: 10px; border-radius: 10px; margin-bottom: 15px; }
+        .mode-btn.target-active { border-color: var(--secondary); background: #e6f4ea; color: var(--secondary); }
+
         #micBtn { 
-            background: var(--primary); color: white; border: none; width: 100px; height: 100px; 
-            border-radius: 50%; font-size: 2.5rem; cursor: pointer; margin: 15px 0;
-            transition: 0.3s;
+            background-color: var(--primary); color: white; border: none; padding: 25px; 
+            border-radius: 50%; font-size: 2.5rem; cursor: pointer; width: 100px; height: 100px; 
+            margin: 15px 0; box-shadow: 0 6px 20px rgba(74,144,226,0.3);
         }
-        #micBtn.recording { background: #ea4335; transform: scale(1.1); }
-        #micBtn:disabled { background: #ccc; cursor: not-allowed; }
-        #translated-text { font-size: 2rem; color: #222; font-weight: bold; margin: 15px 0; min-height: 2.5rem; }
-        #status { color: #888; font-size: 0.85rem; margin-top: 10px; }
+        #micBtn.recording { background-color: #ea4335; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        #result-box { margin-top: 15px; min-height: 120px; }
+        #translated-text { font-size: 2.2rem; color: #333; margin: 10px 0; font-weight: bold; line-height: 1.2; }
+        #original-text { color: #888; font-size: 1rem; font-style: italic; }
+        #status { color: var(--primary); font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+        
+        .play-btn { background: #f1f3f4; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
     </style>
 </head>
 <body>
     <div class="container">
-        <select id="targetLang" onchange="updateLabels()">
-            <option value="日文" data-code="ja-JP">日文 🇯🇵</option>
-            <option value="英文" data-code="en-US">英文 🇺🇸</option>
-            <option value="韓文" data-code="ko-KR">韓文 🇰🇷</option>
-        </select>
-        
+        <div id="status">準備就緒</div>
+
+        <div class="setup-box">
+            <label>選擇目標語系：</label>
+            <select id="targetLang" onchange="updateLabels()">
+                <option value="日文" data-code="ja-JP">日文 🇯🇵</option>
+                <option value="英文" data-code="en-US">英文 🇺🇸</option>
+                <option value="韓文" data-code="ko-KR">韓文 🇰🇷</option>
+                <option value="法文" data-code="fr-FR">法文 🇫🇷</option>
+            </select>
+        </div>
+
         <div class="mode-selector">
-            <button id="btn-me" class="mode-btn active" onclick="setDir('me')">我說中文</button>
-            <button id="btn-other" class="mode-btn" onclick="setDir('other')">對方說<span class="lt">日文</span></button>
+            <button id="btn-me" class="mode-btn active" onclick="setDirection('me')">我說中文<br>➔ <span class="lang-label">日文</span></button>
+            <button id="btn-other" class="mode-btn" onclick="setDirection('other')">對方說<span class="lang-label">日文</span><br>➔ 中文</button>
         </div>
 
         <button id="micBtn">🎤</button>
-        <div id="original-text" style="color:#666;">等待說話...</div>
-        <div id="translated-text">...</div>
-        <div id="status">系統準備就緒</div>
+        
+        <div id="result-box">
+            <div id="original-text">等待語音...</div>
+            <div id="translated-text">...</div>
+            <button class="play-btn" onclick="replayVoice()">🔊 重播</button>
+        </div>
     </div>
 
     <script>
-        let dir = 'me', lastText = "", recognition, isPlaying = false;
-        const micBtn = document.getElementById('micBtn'), status = document.getElementById('status'),
-              tDiv = document.getElementById('translated-text'), oDiv = document.getElementById('original-text'),
-              tSel = document.getElementById('targetLang');
+        let currentDir = 'me'; // 'me' 為我講中文, 'other' 為對方講外語
+        let lastTranslatedText = "";
+        let recognition;
+
+        const micBtn = document.getElementById('micBtn');
+        const status = document.getElementById('status');
+        const translatedDiv = document.getElementById('translated-text');
+        const originalDiv = document.getElementById('original-text');
+        const targetSelect = document.getElementById('targetLang');
 
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
-            recognition.onstart = () => { micBtn.classList.add('recording'); status.innerText = "聆聽中..."; };
-            recognition.onresult = (e) => { 
-                const text = e.results[0][0].transcript;
-                oDiv.innerText = text;
-                doTrans(text);
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => { micBtn.classList.add('recording'); status.innerText = "正在聆聽..."; };
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                originalDiv.innerText = "偵測：" + text;
+                processTranslation(text);
             };
+            recognition.onerror = (e) => { status.innerText = "錯誤: " + e.error; micBtn.classList.remove('recording'); };
             recognition.onend = () => { micBtn.classList.remove('recording'); };
         }
 
-        function setDir(d) {
-            dir = d;
-            document.getElementById('btn-me').className = 'mode-btn ' + (d==='me'?'active':'');
-            document.getElementById('btn-other').className = 'mode-btn ' + (d==='other'?'other-active':'');
-            recognition.lang = (d==='me') ? 'zh-TW' : tSel.options[tSel.selectedIndex].getAttribute('data-code');
+        // 更新按鈕上的文字標籤
+        function updateLabels() {
+            const langName = targetSelect.value;
+            document.querySelectorAll('.lang-label').forEach(el => el.innerText = langName);
+            setDirection(currentDir); // 刷新語音辨識語言
         }
 
-        function updateLabels() {
-            document.querySelector('.lt').innerText = tSel.value;
-            setDir(dir);
+        function setDirection(dir) {
+            currentDir = dir;
+            const selectedOption = targetSelect.options[targetSelect.selectedIndex];
+            const otherLangCode = selectedOption.getAttribute('data-code');
+
+            document.getElementById('btn-me').classList.toggle('active', dir === 'me');
+            document.getElementById('btn-other').classList.toggle('active', dir === 'other');
+            
+            // 設定語音辨識語系
+            recognition.lang = (dir === 'me') ? 'zh-TW' : otherLangCode;
+            micBtn.style.backgroundColor = (dir === 'me') ? "#4A90E2" : "#34A853";
+            status.innerText = "已切換方向";
         }
 
         micBtn.onclick = () => {
-            if(isPlaying) return;
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 喚醒 iOS
-            try { recognition.start(); } catch(e) { recognition.stop(); }
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); // 喚醒音訊
+            if (micBtn.classList.contains('recording')) recognition.stop();
+            else recognition.start();
         };
 
-        async function doTrans(text) {
-            status.innerText = "翻譯中...";
+        async function processTranslation(text) {
+            status.innerText = "AI 翻譯中...";
+            const selectedOption = targetSelect.options[targetSelect.selectedIndex];
+            const langName = selectedOption.value;
+            const langCode = selectedOption.getAttribute('data-code');
+
+            const target = (currentDir === 'me') ? langName : "中文";
+            const voiceLang = (currentDir === 'me') ? langCode : "zh-TW";
+
             try {
-                const res = await fetch('/translate', {
+                const response = await fetch('/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, target: (dir==='me'?tSel.value:'中文') })
+                    body: JSON.stringify({ text, target })
                 });
-                const data = await res.json();
-                tDiv.innerText = data.translatedText;
-                speak(data.translatedText, (dir==='me'?tSel.options[tSel.selectedIndex].getAttribute('data-code'):'zh-TW'));
-            } catch (err) { status.innerText = "連線失敗"; }
+                const data = await response.json();
+                lastTranslatedText = data.translatedText;
+                translatedDiv.innerText = lastTranslatedText;
+                status.innerText = "翻譯完成";
+                
+                speak(lastTranslatedText, voiceLang);
+            } catch (err) {
+                status.innerText = "連線失敗";
+            }
         }
 
-        function speak(t, l) {
+        function speak(text, langCode) {
             window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(t);
-            u.lang = l;
-            u.onstart = () => { isPlaying = true; micBtn.disabled = true; status.innerText = "AI 說話中..."; };
-            u.onend = () => { isPlaying = false; micBtn.disabled = false; status.innerText = "準備就緒"; };
-            window.speechSynthesis.speak(u);
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = langCode;
+            utter.rate = 0.9;
+            window.speechSynthesis.speak(utter);
         }
-        updateLabels();
+
+        function replayVoice() {
+            if (!lastTranslatedText) return;
+            const selectedOption = targetSelect.options[targetSelect.selectedIndex];
+            const voiceLang = (currentDir === 'me') ? selectedOption.getAttribute('data-code') : "zh-TW";
+            speak(lastTranslatedText, voiceLang);
+        }
     </script>
 </body>
 </html>
