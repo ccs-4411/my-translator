@@ -3,51 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 雙向翻譯官</title>
+    <title>隨身翻譯官 (多國語言版)</title>
     <style>
-        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 15px; }
-        .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; appearance: none; background: white; }
-        .btn-group { display: flex; gap: 15px; justify-content: center; margin: 20px 0; }
-        .mic-btn { flex: 1; height: 100px; border-radius: 20px; border: none; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        #btn-me { background: #4A90E2; }
-        #btn-other { background: #34A853; }
-        .mic-btn:active { transform: scale(0.95); opacity: 0.9; }
-        .mic-btn.active { background: #ff4757 !important; animation: pulse 1.2s infinite; }
-        .mic-icon { font-size: 2rem; margin-bottom: 5px; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        #result-box { background: #fdfdfd; border-radius: 15px; padding: 15px; border: 1px solid #eee; margin-top: 15px; min-height: 120px; text-align: left; }
-        #translated { font-size: 1.5rem; font-weight: bold; color: #333; margin: 10px 0; line-height: 1.4; }
-        #original { color: #999; font-size: 0.9rem; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        #status { font-size: 0.8rem; color: #4A90E2; font-weight: bold; margin-bottom: 10px; }
+        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; text-align: center; background: #f4f7f9; margin: 0; padding: 15px; }
+        .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-bottom: 20px; font-size: 1.2rem; }
+        select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 15px; border: 1px solid #ddd; font-size: 1.1rem; background: #fff; cursor: pointer; }
+        .btn-group { display: flex; gap: 15px; justify-content: center; margin: 25px 0; }
+        .mic-btn { flex: 1; height: 110px; border-radius: 25px; border: none; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #btn-me { background: #007AFF; } /* 藍色: 我講中文 */
+        #btn-other { background: #34C759; } /* 綠色: 對方講外語 */
+        .mic-btn:active { transform: scale(0.92); opacity: 0.8; }
+        .mic-btn.active { background: #FF3B30 !important; animation: pulse 1s infinite; }
+        .mic-icon { font-size: 2.2rem; margin-bottom: 8px; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+        #result-box { background: #fafafa; border-radius: 20px; padding: 20px; border: 1px solid #eee; margin-top: 20px; min-height: 140px; text-align: left; position: relative; }
+        #translated { font-size: 1.6rem; font-weight: bold; color: #222; margin: 10px 0; line-height: 1.3; }
+        #original { color: #888; font-size: 0.95rem; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 5px; }
+        #status { font-size: 0.85rem; color: #007AFF; font-weight: 600; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <div id="status">系統準備就緒</div>
-        
-        <!-- 翻譯引擎選擇 -->
-        <select id="engine">
-            <option value="gemini">AI 智慧翻譯 (Gemini)</option>
-            <option value="google">傳統穩定模式 (Google)</option>
-        </select>
 
-        <!-- 目標語言選擇 -->
+    <div class="card">
+        <h2>🌐 雙向即時翻譯</h2>
+        <div id="status">系統就緒</div>
+
+        <!-- 語言選擇器 -->
         <select id="target" onchange="updateUI()">
-            <option value="英文" data-v="en-US">英文 🇺🇸</option>
-            <option value="日文" data-v="ja-JP">日文 🇯🇵</option>
-            <option value="韓文" data-v="ko-KR">韓文 🇰🇷</option>
-            <option value="法文" data-v="fr-FR">法文 🇫🇷</option>
+            <option value="英文" data-v="en-US">英文 English 🇺🇸</option>
+            <option value="日文" data-v="ja-JP">日文 日本語 🇯🇵</option>
+            <option value="韓文" data-v="ko-KR">韓文 한국어 🇰🇷</option>
+            <option value="越南文" data-v="vi-VN">越南文 Tiếng Việt 🇻🇳</option>
+            <option value="西班牙文" data-v="es-ES">西班牙文 Español 🇪🇸</option>
+            <option value="泰文" data-v="th-TH">泰文 ภาษาไทย 🇹🇭</option>
         </select>
 
         <div class="btn-group">
-            <!-- 按鈕 1: 我講中文 -->
+            <!-- 按鈕：我講中文 -->
             <button id="btn-me" class="mic-btn" onclick="startRecognition('me')">
                 <span class="mic-icon">🎤</span>
                 <span>我講中文</span>
             </button>
             
-            <!-- 按鈕 2: 對方講外語 -->
+            <!-- 按鈕：對方講外語 -->
             <button id="btn-other" class="mic-btn" onclick="startRecognition('other')">
                 <span class="mic-icon">🎧</span>
                 <span>對方講<span id="target-label">英文</span></span>
@@ -55,8 +54,9 @@
         </div>
 
         <div id="result-box">
+            <div id="status-text" style="font-size: 0.7rem; color: #ccc; text-align: right;">v2026.05.01</div>
             <div id="original">等待辨識...</div>
-            <div id="translated">翻譯結果將顯示於此</div>
+            <div id="translated">翻譯結果</div>
         </div>
     </div>
 
@@ -65,9 +65,9 @@
         recognition.continuous = false;
         recognition.interimResults = false;
 
-        let currentMode = 'me';
+        let currentMode = 'me'; // 'me' 或 'other'
 
-        // 更新介面顯示文字
+        // 切換 UI 文字
         function updateUI() {
             const targetName = document.getElementById('target').value;
             document.getElementById('target-label').innerText = targetName;
@@ -76,34 +76,32 @@
         recognition.onstart = () => {
             const btnId = currentMode === 'me' ? 'btn-me' : 'btn-other';
             document.getElementById(btnId).classList.add('active');
-            document.getElementById('status').innerText = "正在聆聽...";
+            document.getElementById('status').innerText = "🎤 正在聆聽中...";
         };
 
         recognition.onend = () => {
             document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('status').innerText = "辨識完成";
+            document.getElementById('status').innerText = "✅ 辨識完成";
         };
 
         recognition.onresult = async (event) => {
             const text = event.results[0][0].transcript;
-            document.getElementById('original').innerText = text;
-            sendTranslateRequest(text);
+            document.getElementById('original').innerText = "辨識到：" + text;
+            callTranslateAPI(text);
         };
 
-        async function sendTranslateRequest(text) {
-            document.getElementById('status').innerText = "翻譯中...";
+        async function callTranslateAPI(text) {
+            document.getElementById('status').innerText = "⏳ 翻譯中...";
             const target = document.getElementById('target').value;
-            const engine = document.getElementById('engine').value;
 
             try {
-                // 重點：將請求發送到 '/' 並使用 POST，繞過 Render 的路由問題
+                // 這裡改為直接請求 '/'，因為 app.py 已經把 POST 邏輯掛在根目錄
                 const response = await fetch('/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         text: text, 
                         target: target, 
-                        engine: engine, 
                         mode: currentMode 
                     })
                 });
@@ -112,17 +110,17 @@
                 const result = data.translatedText;
                 
                 document.getElementById('translated').innerText = result;
-                document.getElementById('status').innerText = "翻譯完成";
+                document.getElementById('status').innerText = "🔊 正在發音...";
 
-                // 發音處理
+                // 判斷發音語系
                 const targetDropdown = document.getElementById('target');
                 const voiceCode = currentMode === 'me' ? 
                     targetDropdown.options[targetDropdown.selectedIndex].getAttribute('data-v') : 'zh-TW';
                 
                 speak(result, voiceCode);
             } catch (error) {
-                document.getElementById('translated').innerText = "連線失敗，請稍後再試";
-                document.getElementById('status').innerText = "錯誤";
+                document.getElementById('translated').innerText = "❌ 錯誤：無法連線至伺服器";
+                document.getElementById('status').innerText = "連線失敗";
             }
         }
 
@@ -130,7 +128,7 @@
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
-            utterance.rate = 0.9;
+            utterance.rate = 0.95;
             window.speechSynthesis.speak(utterance);
         }
 
@@ -138,27 +136,21 @@
             currentMode = mode;
             window.speechSynthesis.cancel(); 
             
-            // 設定辨識語言
             const targetDropdown = document.getElementById('target');
-            const langCode = mode === 'me' ? 'zh-TW' : targetDropdown.options[targetDropdown.selectedIndex].getAttribute('data-v');
+            // 如果是我講，聽中文；如果是對方講，聽該國外語
+            const listenLang = mode === 'me' ? 'zh-TW' : targetDropdown.options[targetDropdown.selectedIndex].getAttribute('data-v');
             
-            recognition.lang = langCode;
+            recognition.lang = listenLang;
             
             try {
                 recognition.start();
             } catch (e) {
                 recognition.stop();
-                setTimeout(() => recognition.start(), 100);
+                setTimeout(() => recognition.start(), 200);
             }
         }
 
-        // 初始化 UI
-        updateUI();
-    </script>
-</body>
-</html>
-        
-        updateUI();
+        updateUI(); // 初始化
     </script>
 </body>
 </html>
