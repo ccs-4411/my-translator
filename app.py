@@ -18,14 +18,14 @@ def home():
         if not data:
             return jsonify({"translatedText": "無數據"}), 400
 
-        text = data.get('text', '')
+        text = data.get('text', '').strip()
         target_name = data.get('target', '英文')
         mode = data.get('mode', 'me')
 
         if not text:
             return jsonify({"translatedText": ""})
 
-        # 這裡的名稱必須與前端選單顯示的文字完全一致
+        # 語言代碼表 (需與前端 index.html 完全一致)
         codes = {
             "英文": "en",
             "日文": "ja",
@@ -41,20 +41,30 @@ def home():
             "菲律賓文": "tl"
         }
 
-        # 如果是對方講話，翻譯目標固定為繁體中文
+        # 取得選單語系的代碼
+        target_lang_code = codes.get(target_name, "en")
+
+        # --- 強化翻譯邏輯 ---
         if mode == 'other':
-            t_code = "zh-TW"
+            # 對方講外語：來源是選單語言，目標是中文
+            source_lang = target_lang_code
+            target_lang = "zh-TW"
         else:
-            # 如果在字典找不到，才預設為英文
-            t_code = codes.get(target_name, "en")
+            # 我講中文：來源是中文，目標是選單語言
+            source_lang = "zh-TW"
+            target_lang = target_lang_code
         
-        translated = GoogleTranslator(source='auto', target=t_code).translate(text)
+        # 明確指定 source，不讓 Google 用猜的，準確度大幅提升
+        translated = GoogleTranslator(source=source_lang, target=target_lang).translate(text)
+        
+        print(f"[{mode}] 翻譯: {text} ({source_lang}) -> {translated} ({target_lang})")
         return jsonify({"translatedText": translated})
 
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"translatedText": "翻譯伺服器暫時無回應"}), 500
+        print(f"翻譯錯誤報錯: {e}")
+        return jsonify({"translatedText": "翻譯連線逾時，請重試"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)00))
     app.run(host='0.0.0.0', port=port)
