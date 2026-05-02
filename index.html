@@ -5,141 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 雙向語音翻譯官</title>
     <style>
-        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 15px; }
-        .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 30px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
-        h2 { color: #1a73e8; margin-bottom: 15px; }
-        #status { font-size: 0.9rem; color: #666; margin-bottom: 10px; height: 1.2rem; }
-        select { width: 100%; padding: 15px; margin: 10px 0; border-radius: 15px; border: 2px solid #eee; font-size: 1.1rem; background: #fff; -webkit-appearance: none; }
-        .btn-group { display: flex; gap: 15px; margin: 25px 0; }
-        .mic-btn { flex: 1; height: 120px; border-radius: 25px; border: none; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; transition: 0.2s; }
+        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; text-align: center; background: #f4f7f9; margin: 0; padding: 15px; }
+        .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h2 { color: #1a73e8; margin-bottom: 20px; }
+        #status { font-size: 0.85rem; color: #888; margin-bottom: 10px; height: 1.2rem; }
+        
+        .select-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        select { flex: 1; padding: 12px; border-radius: 12px; border: 2px solid #eee; font-size: 1rem; outline: none; }
+        .add-btn { width: 45px; background: #e8f0fe; border: none; border-radius: 12px; color: #1a73e8; font-size: 1.4rem; cursor: pointer; }
+
+        .btn-group { display: flex; gap: 15px; margin-bottom: 25px; }
+        .mic-btn { flex: 1; height: 110px; border-radius: 20px; border: none; color: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
         #btn-me { background: #1a73e8; } 
         #btn-other { background: #34a853; }
-        .mic-btn:active { transform: scale(0.95); opacity: 0.8; }
         .mic-btn.active { background: #ea4335 !important; animation: pulse 1s infinite; }
-        .mic-icon { font-size: 2.5rem; margin-bottom: 5px; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        #result-box { background: #f8f9fa; border-radius: 20px; padding: 20px; text-align: left; border: 1px solid #eef; min-height: 150px; }
-        #original { color: #888; font-size: 0.9rem; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px; min-height: 1.2rem; }
-        #translated { font-size: 1.7rem; font-weight: bold; color: #202124; line-height: 1.3; word-break: break-word; }
+        
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+        
+        #result-box { background: #fafafa; border-radius: 20px; padding: 20px; text-align: left; border: 1px solid #eee; min-height: 120px; }
+        #original { color: #999; font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        #translated { font-size: 1.5rem; font-weight: bold; color: #333; line-height: 1.4; }
+
+        /* 語言切換彈窗 */
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99; align-items: center; justify-content: center; }
+        .modal-body { background: white; width: 80%; max-width: 300px; border-radius: 20px; padding: 20px; max-height: 60vh; overflow-y: auto; }
+        .lang-item { padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2>雙向翻譯官</h2>
-    <div id="status">準備就緒</div>
+    <div id="status">系統就緒</div>
 
-    <select id="target" onchange="updateUI()">
-        <option value="英文" data-v="en-US">英文 English 🇺🇸</option>
-        <option value="日文" data-v="ja-JP">日文 日本語 🇯🇵</option>
-        <option value="韓文" data-v="ko-KR">韓文 한국어 🇰🇷</option>
-        <option value="越南文" data-v="vi-VN">越南文 Tiếng Việt 🇻🇳</option>
-        <option value="西班牙文" data-v="es-ES">西班牙文 Español 🇪🇸</option>
-        <option value="泰文" data-v="th-TH">泰文 ภาษาไทย 🇹🇭</option>
-    </select>
+    <div class="select-container">
+        <select id="target" onchange="updateLabel()">
+            <option value="英文" data-v="en-US">英文 English 🇺🇸</option>
+            <option value="日文" data-v="ja-JP">日文 日本語 🇯🇵</option>
+            <option value="韓文" data-v="ko-KR">韓文 한국어 🇰🇷</option>
+            <option value="越南文" data-v="vi-VN">越南文 Tiếng Việt 🇻🇳</option>
+            <option value="泰文" data-v="th-TH">泰文 ภาษาไทย 🇹🇭</option>
+        </select>
+        <button class="add-btn" onclick="toggleModal(true)">＋</button>
+    </div>
 
     <div class="btn-group">
-        <button id="btn-me" class="mic-btn" onclick="startRecognition('me')">
-            <span class="mic-icon">🎤</span>
-            <span>我講中文</span>
-        </button>
-        <button id="btn-other" class="mic-btn" onclick="startRecognition('other')">
-            <span class="mic-icon">🎧</span>
-            <span>對方講<span id="target-label">英文</span></span>
-        </button>
+        <button id="btn-me" class="mic-btn" onclick="runMic('me')">我講中文</button>
+        <button id="btn-other" class="mic-btn" onclick="runMic('other')">對方講<span id="target-name">英文</span></button>
     </div>
 
     <div id="result-box">
-        <div id="original">等待辨識...</div>
+        <div id="original">...</div>
         <div id="translated">翻譯結果</div>
     </div>
 </div>
 
-<script>
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+<div id="modal" onclick="toggleModal(false)">
+    <div class="modal-body" onclick="event.stopPropagation()">
+        <div style="font-weight:bold; margin-bottom:10px;">新增語言</div>
+        <div id="lang-list"></div>
+    </div>
+</div>
 
+<script>
+    const extraLangs = {
+        "法文": { v: "fr-FR", e: "🇫🇷" },
+        "德文": { v: "de-DE", e: "🇩🇪" },
+        "俄文": { v: "ru-RU", e: "🇷🇺" },
+        "印尼文": { v: "id-ID", e: "🇮🇩" },
+        "義大利文": { v: "it-IT", e: "🇮🇹" }
+    };
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     let currentMode = 'me';
 
-    function updateUI() {
-        document.getElementById('target-label').innerText = document.getElementById('target').value;
+    function updateLabel() {
+        document.getElementById('target-name').innerText = document.getElementById('target').value;
+    }
+
+    function toggleModal(show) {
+        const m = document.getElementById('modal');
+        m.style.display = show ? 'flex' : 'none';
+        if(show) {
+            const list = document.getElementById('lang-list');
+            list.innerHTML = '';
+            for(let name in extraLangs) {
+                let div = document.createElement('div');
+                div.className = 'lang-item';
+                div.innerHTML = `${extraLangs[name].e} ${name} <span>+</span>`;
+                div.onclick = () => addLang(name);
+                list.appendChild(div);
+            }
+        }
+    }
+
+    function addLang(name) {
+        const sel = document.getElementById('target');
+        // 檢查是否已存在
+        for(let opt of sel.options) { if(opt.value === name) { sel.value = name; toggleModal(false); updateLabel(); return; } }
+        
+        let opt = document.createElement('option');
+        opt.value = name;
+        opt.innerText = `${name} ${extraLangs[name].e}`;
+        opt.setAttribute('data-v', extraLangs[name].v);
+        sel.appendChild(opt);
+        sel.value = name;
+        updateLabel();
+        toggleModal(false);
     }
 
     recognition.onstart = () => {
-        const btnId = currentMode === 'me' ? 'btn-me' : 'btn-other';
-        document.getElementById(btnId).classList.add('active');
-        document.getElementById('status').innerText = "正在聆聽...";
+        document.getElementById(currentMode === 'me' ? 'btn-me' : 'btn-other').classList.add('active');
+        document.getElementById('status').innerText = "聆聽中...";
     };
 
     recognition.onend = () => {
         document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('status').innerText = "處理中...";
     };
 
-    recognition.onresult = async (event) => {
-        const text = event.results[0][0].transcript;
+    recognition.onresult = async (e) => {
+        const text = e.results[0][0].transcript;
         document.getElementById('original').innerText = text;
-        doTranslate(text);
+        document.getElementById('status').innerText = "翻譯中...";
+
+        const target = document.getElementById('target').value;
+        const res = await fetch('/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, target, mode: currentMode })
+        });
+        const data = await res.json();
+        document.getElementById('translated').innerText = data.translatedText;
+
+        const sel = document.getElementById('target');
+        const vCode = currentMode === 'me' ? sel.options[sel.selectedIndex].getAttribute('data-v') : 'zh-TW';
+        speak(data.translatedText, vCode);
     };
 
-    async function doTranslate(text) {
-        const target = document.getElementById('target').value;
-        try {
-            const response = await fetch('/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, target, mode: currentMode })
-            });
-            const data = await response.json();
-            const result = data.translatedText;
-            
-            document.getElementById('translated').innerText = result;
-            document.getElementById('status').innerText = "播放語音...";
-
-            const targetSelect = document.getElementById('target');
-            const voiceCode = currentMode === 'me' ? 
-                targetSelect.options[targetSelect.selectedIndex].getAttribute('data-v') : 'zh-TW';
-            
-            speak(result, voiceCode);
-        } catch (e) {
-            document.getElementById('translated').innerText = "連線失敗";
-            document.getElementById('status').innerText = "錯誤";
-        }
+    function speak(txt, lang) {
+        window.speechSynthesis.cancel();
+        setTimeout(() => {
+            const msg = new SpeechSynthesisUtterance(txt);
+            msg.lang = lang;
+            window.speechSynthesis.speak(msg);
+            document.getElementById('status').innerText = "完成";
+        }, 100);
     }
 
-    // 播放語音函式
-    function speak(text, lang) {
-        window.speechSynthesis.cancel(); // 先停止之前的聲音
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = lang;
-        msg.rate = 1.0;
-        msg.pitch = 1.0;
-        
-        // 針對 iOS 的修正：確保語音在完成時更新狀態
-        msg.onend = () => { document.getElementById('status').innerText = "完成"; };
-        window.speechSynthesis.speak(msg);
-    }
-
-    function startRecognition(mode) {
-        // 重要：在用戶點擊按鈕的瞬間先解鎖音訊
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("")); 
-        
+    function runMic(mode) {
+        // 解鎖 iOS 語音
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
         currentMode = mode;
-        const targetSelect = document.getElementById('target');
-        recognition.lang = mode === 'me' ? 'zh-TW' : targetSelect.options[targetSelect.selectedIndex].getAttribute('data-v');
-        
-        try {
-            recognition.start();
-        } catch (e) {
-            recognition.stop();
-            setTimeout(() => recognition.start(), 200);
-        }
+        const sel = document.getElementById('target');
+        recognition.lang = mode === 'me' ? 'zh-TW' : sel.options[sel.selectedIndex].getAttribute('data-v');
+        try { recognition.start(); } catch(e) { recognition.stop(); }
     }
-
-    updateUI();
 </script>
-</body>
-</html>
 </body>
 </html>
