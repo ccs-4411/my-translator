@@ -15,7 +15,7 @@
   {"group":"歐洲","name":"捷克文","code":"cs","voice":"cs-CZ","label":"Čeština 🇨🇿"},
   {"group":"歐洲","name":"丹麥文","code":"da","voice":"da-DK","label":"Dansk 🇩🇰"},
   {"group":"歐洲","name":"芬蘭文","code":"fi","voice":"fi-FI","label":"Suomi 🇫🇮"},
-  {"group":"歐洲","name":"瑞典文","code":"sv","voice":"sv-SE","label":"Svenska 🇸🇪"}
+  {"group":"歐洲","name":"瑞典文","code":"sv","voice":"sv-SE","label":"Svenska 🇸🇪"},
 
   {"group":"東南亞","name":"越南文","code":"vi","voice":"vi-VN","label":"Tiếng Việt 🇻🇳"},
   {"group":"東南亞","name":"泰文","code":"th","voice":"th-TH","label":"ภาษาไทย 🇹🇭"}
