@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>語音翻譯官</title>
 
@@ -53,18 +53,12 @@ select {
     border-radius:25px;
     color:white;
     font-size:1.1rem;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
 }
 
 #btn-me { background:#1a73e8; }
 #btn-other { background:#34a853; }
 
-.mic-btn.active {
-    background:#ea4335 !important;
-}
+.mic-btn.active { background:#ea4335 !important; }
 
 #result-box {
     background:#f8f9fa;
@@ -91,7 +85,7 @@ select {
 
 <div class="card">
 <h2>語音翻譯官</h2>
-<div id="status">準備就緒</div>
+<div id="status">初始化中...</div>
 
 <select id="target"></select>
 
@@ -113,10 +107,9 @@ select {
 
 <script>
 let LANGS = [];
-let voices = [];
 
 /* =========================
-   🔥 iPhone 音訊解鎖
+   🔥 LINE / iPhone 解鎖
 ========================= */
 function unlockAudio() {
     const u = new SpeechSynthesisUtterance(" ");
@@ -127,13 +120,36 @@ function unlockAudio() {
 document.addEventListener("click", unlockAudio, { once: true });
 
 /* =========================
-   載入語言
+   初始化（重點🔥）
+========================= */
+async function initApp() {
+    try {
+        document.getElementById("status").innerText = "載入語言中...";
+
+        await loadLanguages();
+
+        updateLabel();
+
+        document.getElementById("status").innerText = "準備就緒";
+    } catch (e) {
+        console.log("初始化失敗，重試", e);
+        setTimeout(initApp, 800);
+    }
+}
+
+window.addEventListener("load", initApp);
+
+/* =========================
+   載入語言（LINE穩定版）
 ========================= */
 async function loadLanguages() {
+    const sel = document.getElementById("target");
+
+    if (!sel) return;
+
     const res = await fetch("/languages");
     LANGS = await res.json();
 
-    const sel = document.getElementById("target");
     sel.innerHTML = "";
 
     const groups = {};
@@ -143,7 +159,7 @@ async function loadLanguages() {
         groups[l.group].push(l);
     });
 
-    for (let g in groups) {
+    Object.keys(groups).forEach(g => {
         const optgroup = document.createElement("optgroup");
         optgroup.label = g;
 
@@ -156,13 +172,13 @@ async function loadLanguages() {
         });
 
         sel.appendChild(optgroup);
-    }
+    });
 
-    updateLabel();
+    sel.selectedIndex = 0;
 }
 
 /* =========================
-   更新 UI
+   UI 更新
 ========================= */
 function updateLabel() {
     const sel = document.getElementById("target");
@@ -170,12 +186,16 @@ function updateLabel() {
 }
 
 /* =========================
-   Speech Recognition
+   語音辨識
 ========================= */
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
+let currentMode = "me";
+
 function runMic(mode) {
     const sel = document.getElementById("target");
+
+    currentMode = mode;
 
     recognition.lang = mode === "me"
         ? "zh-TW"
@@ -184,7 +204,7 @@ function runMic(mode) {
     document.getElementById(mode === 'me' ? 'btn-me' : 'btn-other')
         .classList.add('active');
 
-    document.getElementById("status").innerText = "🎤 聆聽中...";
+    document.getElementById("status").innerText = "聆聽中...";
 
     try { recognition.start(); } catch(e) { recognition.stop(); }
 }
@@ -195,7 +215,7 @@ recognition.onend = () => {
 };
 
 /* =========================
-   翻譯 + 語音
+   翻譯 + 播放（LINE穩定）
 ========================= */
 recognition.onresult = (e) => {
     const text = e.results[0][0].transcript;
@@ -210,14 +230,13 @@ recognition.onresult = (e) => {
         body: JSON.stringify({
             text,
             target: sel.value,
-            mode: (recognition.lang === "zh-TW") ? "me" : "other"
+            mode: currentMode
         })
     })
     .then(res => res.json())
     .then(data => {
         document.getElementById("translated").innerText = data.translatedText;
 
-        // 🔥 iPhone 穩定播放
         setTimeout(() => {
             speak(data.translatedText, sel.selectedOptions[0].dataset.v);
         }, 80);
@@ -225,13 +244,12 @@ recognition.onresult = (e) => {
 };
 
 /* =========================
-   🔥 修正版 Speak（穩定）
+   語音播放（穩定版）
 ========================= */
 function speak(text, lang) {
     speechSynthesis.cancel();
 
     const msg = new SpeechSynthesisUtterance(text);
-
     msg.lang = lang;
     msg.rate = 1;
 
@@ -239,13 +257,15 @@ function speak(text, lang) {
 }
 
 /* =========================
-   啟動 voices（iOS 用）
+   fallback 防 LINE delay
 ========================= */
-speechSynthesis.onvoiceschanged = () => {
-    voices = speechSynthesis.getVoices();
-};
+setTimeout(() => {
+    const sel = document.getElementById("target");
+    if (sel && sel.options.length === 0) {
+        loadLanguages();
+    }
+}, 1000);
 
-loadLanguages();
 </script>
 
 </body>
