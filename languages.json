@@ -1,0 +1,10 @@
+[
+  {"name": "英文", "code": "en", "voice": "en-US", "label": "English 🇺🇸"},
+  {"name": "日文", "code": "ja", "voice": "ja-JP", "label": "日本語 🇯🇵"},
+  {"name": "韓文", "code": "ko", "voice": "ko-KR", "label": "한국어 🇰🇷"},
+  {"name": "越南文", "code": "vi", "voice": "vi-VN", "label": "Tiếng Việt 🇻🇳"},
+  {"name": "西班牙文", "code": "es", "voice": "es-ES", "label": "Español 🇪🇸"},
+  {"name": "泰文", "code": "th", "voice": "th-TH", "label": "ภาษาไทย 🇹🇭"},
+  {"name": "法文", "code": "fr", "voice": "fr-FR", "label": "Français 🇫🇷"},
+  {"name": "德文", "code": "de", "voice": "de-DE", "label": "Deutsch 🇩🇪"}
+]
