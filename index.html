@@ -2,34 +2,87 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-<title>翻譯官</title>
+<title>語音翻譯官</title>
 
 <style>
-body { font-family:sans-serif; background:#f2f4f7; text-align:center; padding:15px; }
-.card { max-width:450px; margin:auto; background:white; padding:20px; border-radius:25px; }
+body {
+    font-family: -apple-system, "Microsoft JhengHei", sans-serif;
+    background:#f2f4f7;
+    margin:0;
+    padding:15px;
+    text-align:center;
+}
 
-select { width:100%; padding:12px; font-size:1rem; }
+.card {
+    max-width:450px;
+    margin:auto;
+    background:white;
+    padding:25px;
+    border-radius:30px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.1);
+}
 
-.btn-group { display:flex; gap:10px; margin-top:15px; }
+h2 { color:#1a73e8; }
 
-button {
-    flex:1;
-    padding:20px;
-    border:none;
+#status {
+    font-size:0.85rem;
+    color:#888;
+    margin-bottom:10px;
+}
+
+select {
+    width:100%;
+    padding:14px;
     border-radius:15px;
+    border:2px solid #eee;
+    font-size:1.1rem;
+}
+
+.btn-group {
+    display:flex;
+    gap:10px;
+    margin:20px 0;
+}
+
+.mic-btn {
+    flex:1;
+    height:110px;
+    border:none;
+    border-radius:25px;
     color:white;
+    font-size:1.1rem;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
 }
 
 #btn-me { background:#1a73e8; }
 #btn-other { background:#34a853; }
 
-#result {
-    margin-top:15px;
-    background:#f5f5f5;
-    padding:10px;
-    border-radius:10px;
+.mic-btn.active {
+    background:#ea4335 !important;
+}
+
+#result-box {
+    background:#f8f9fa;
+    border-radius:20px;
+    padding:15px;
+    text-align:left;
+}
+
+#original {
+    color:#888;
+    margin-bottom:8px;
+    border-bottom:1px dotted #ccc;
+    padding-bottom:5px;
+}
+
+#translated {
+    font-size:1.5rem;
+    font-weight:bold;
 }
 </style>
 </head>
@@ -37,31 +90,33 @@ button {
 <body>
 
 <div class="card">
-
-<h2>語音翻譯</h2>
-
-<div id="status">初始化中...</div>
+<h2>語音翻譯官</h2>
+<div id="status">準備就緒</div>
 
 <select id="target"></select>
 
 <div class="btn-group">
-<button id="btn-me" onclick="runMic('me')">🎤 我講中文</button>
-<button id="btn-other" onclick="runMic('other')">🎧 對方</button>
+<button id="btn-me" class="mic-btn" onclick="runMic('me')">
+🎤 我講中文
+</button>
+
+<button id="btn-other" class="mic-btn" onclick="runMic('other')">
+🎧 對方講 <span id="target-name"></span>
+</button>
 </div>
 
-<div id="result">
+<div id="result-box">
 <div id="original">...</div>
 <div id="translated">翻譯結果</div>
 </div>
-
 </div>
 
 <script>
-
-let currentMode = "me";
+let LANGS = [];
+let voices = [];
 
 /* =========================
-   🔥 手機解鎖音訊
+   🔥 iPhone 音訊解鎖
 ========================= */
 function unlockAudio() {
     const u = new SpeechSynthesisUtterance(" ");
@@ -69,144 +124,128 @@ function unlockAudio() {
     speechSynthesis.speak(u);
     speechSynthesis.cancel();
 }
-document.addEventListener("touchstart", unlockAudio, { once: true });
+document.addEventListener("click", unlockAudio, { once: true });
 
 /* =========================
-   初始化（防 LINE / 手機卡）
+   載入語言
 ========================= */
-async function init() {
-    try {
-        await loadLangs();
-        document.getElementById("status").innerText = "準備就緒";
-    } catch(e) {
-        console.log(e);
-        setTimeout(init, 800);
-    }
-}
-
-window.addEventListener("load", init);
-
-
-/* =========================
-   語言載入
-========================= */
-async function loadLangs() {
-    const sel = document.getElementById("target");
-
+async function loadLanguages() {
     const res = await fetch("/languages");
-    const data = await res.json();
+    LANGS = await res.json();
 
+    const sel = document.getElementById("target");
     sel.innerHTML = "";
 
-    data.forEach(l => {
-        const opt = document.createElement("option");
-        opt.value = l.name;
-        opt.textContent = l.name;
-        opt.dataset.v = l.voice;
-        sel.appendChild(opt);
+    const groups = {};
+
+    LANGS.forEach(l => {
+        if (!groups[l.group]) groups[l.group] = [];
+        groups[l.group].push(l);
     });
 
-    sel.selectedIndex = 0;
+    for (let g in groups) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = g;
+
+        groups[g].forEach(l => {
+            const opt = document.createElement("option");
+            opt.value = l.name;
+            opt.textContent = `${l.name} ${l.label}`;
+            opt.dataset.v = l.voice;
+            optgroup.appendChild(opt);
+        });
+
+        sel.appendChild(optgroup);
+    }
+
+    updateLabel();
 }
 
+/* =========================
+   更新 UI
+========================= */
+function updateLabel() {
+    const sel = document.getElementById("target");
+    document.getElementById("target-name").innerText = sel.value;
+}
 
 /* =========================
-   語音辨識
+   Speech Recognition
 ========================= */
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
 function runMic(mode) {
-    currentMode = mode;
-
     const sel = document.getElementById("target");
 
     recognition.lang = mode === "me"
         ? "zh-TW"
         : sel.selectedOptions[0].dataset.v;
 
-    try {
-        recognition.start();
-    } catch(e) {
-        recognition.stop();
-    }
+    document.getElementById(mode === 'me' ? 'btn-me' : 'btn-other')
+        .classList.add('active');
+
+    document.getElementById("status").innerText = "🎤 聆聽中...";
+
+    try { recognition.start(); } catch(e) { recognition.stop(); }
 }
 
+recognition.onend = () => {
+    document.querySelectorAll('.mic-btn')
+        .forEach(b => b.classList.remove('active'));
+};
 
 /* =========================
-   timeout fetch（手機必備）
+   翻譯 + 語音
 ========================= */
-function fetchTimeout(url, opt, t=8000) {
-    return Promise.race([
-        fetch(url, opt),
-        new Promise((_, r)=>setTimeout(()=>r("timeout"), t))
-    ]);
-}
-
-
-/* =========================
-   結果處理
-========================= */
-recognition.onresult = async (e) => {
+recognition.onresult = (e) => {
     const text = e.results[0][0].transcript;
 
     document.getElementById("original").innerText = text;
 
     const sel = document.getElementById("target");
 
-    try {
-        const res = await fetchTimeout("/", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({
-                text,
-                target: sel.value,
-                mode: currentMode
-            })
-        });
-
-        const data = await res.json();
-
+    fetch("/", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            text,
+            target: sel.value,
+            mode: (recognition.lang === "zh-TW") ? "me" : "other"
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
         document.getElementById("translated").innerText = data.translatedText;
 
+        // 🔥 iPhone 穩定播放
         setTimeout(() => {
             speak(data.translatedText, sel.selectedOptions[0].dataset.v);
-        }, 100);
-
-    } catch(e) {
-        document.getElementById("translated").innerText = "伺服器忙碌";
-    }
+        }, 80);
+    });
 };
 
-
 /* =========================
-   🔥 手機穩定 TTS
+   🔥 修正版 Speak（穩定）
 ========================= */
-async function speak(text, lang) {
-    try {
-        const res = await fetch("/tts", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({
-                text,
-                lang: lang.split("-")[0]
-            })
-        });
+function speak(text, lang) {
+    speechSynthesis.cancel();
 
-        const data = await res.json();
+    const msg = new SpeechSynthesisUtterance(text);
 
-        const audio = new Audio(data.audio_url);
+    msg.lang = lang;
+    msg.rate = 1;
 
-        setTimeout(() => {
-            audio.play().catch(e => {
-                console.log("blocked", e);
-            });
-        }, 120);
-
-    } catch(e) {
-        console.log("tts error", e);
-    }
+    speechSynthesis.speak(msg);
 }
 
+/* =========================
+   啟動 voices（iOS 用）
+========================= */
+speechSynthesis.onvoiceschanged = () => {
+    voices = speechSynthesis.getVoices();
+};
+
+loadLanguages();
 </script>
 
 </body>
