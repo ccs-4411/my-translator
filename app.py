@@ -1,69 +1,25 @@
-import os
-import uuid
+import os, uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 from gtts import gTTS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # =========================
-# 主頁
+# 前端
 # =========================
-@app.route("/", methods=["GET", "POST"])
-def home():
-    if request.method == "GET":
-        return send_from_directory(BASE_DIR, "index.html")
-
-    try:
-        data = request.get_json()
-
-        text = data.get("text", "").strip()
-        target_name = data.get("target", "英文")
-        mode = data.get("mode", "me")
-
-        if not text:
-            return jsonify({"translatedText": ""})
-
-        codes = {
-            "英文": "en",
-            "日文": "ja",
-            "韓文": "ko",
-            "越南文": "vi",
-            "西班牙文": "es",
-            "泰文": "th",
-            "法文": "fr",
-            "德文": "de",
-            "印尼文": "id",
-            "俄文": "ru",
-            "義大利文": "it",
-            "菲律賓文": "tl"
-        }
-
-        target = codes.get(target_name, "en")
-
-        if mode == "other":
-            source = target
-            target_lang = "zh-TW"
-        else:
-            source = "zh-TW"
-            target_lang = target
-
-        result = GoogleTranslator(source=source, target=target_lang).translate(text)
-
-        return jsonify({"translatedText": result})
-
-    except Exception as e:
-        print("error:", e)
-        return jsonify({"translatedText": "錯誤"}), 500
+@app.route("/")
+def index():
+    return send_from_directory(BASE_DIR, "index.html")
 
 
 # =========================
-# languages API
+# 語言
 # =========================
 @app.route("/languages")
 def languages():
@@ -71,12 +27,46 @@ def languages():
         {"name":"英文","voice":"en-US"},
         {"name":"日文","voice":"ja-JP"},
         {"name":"韓文","voice":"ko-KR"},
+        {"name":"西班牙文","voice":"es-ES"},
         {"name":"法文","voice":"fr-FR"},
         {"name":"德文","voice":"de-DE"},
-        {"name":"西班牙文","voice":"es-ES"},
-        {"name":"越南文","voice":"vi-VN"},
-        {"name":"泰文","voice":"th-TH"}
+        {"name":"泰文","voice":"th-TH"},
+        {"name":"越南文","voice":"vi-VN"}
     ])
+
+
+# =========================
+# 翻譯
+# =========================
+@app.route("/", methods=["POST"])
+def translate():
+    try:
+        data = request.get_json()
+        text = data.get("text","")
+        target = data.get("target","英文")
+        mode = data.get("mode","me")
+
+        codes = {
+            "英文":"en","日文":"ja","韓文":"ko","西班牙文":"es",
+            "法文":"fr","德文":"de","泰文":"th","越南文":"vi"
+        }
+
+        target_code = codes.get(target,"en")
+
+        if mode == "other":
+            src = target_code
+            tgt = "zh-TW"
+        else:
+            src = "zh-TW"
+            tgt = target_code
+
+        result = GoogleTranslator(source=src, target=tgt).translate(text)
+
+        return jsonify({"translatedText": result})
+
+    except Exception as e:
+        print(e)
+        return jsonify({"translatedText":"錯誤"}), 500
 
 
 # =========================
@@ -86,11 +76,11 @@ def languages():
 def tts():
     try:
         data = request.get_json()
-        text = data.get("text", "")
-        lang = data.get("lang", "en")
+        text = data.get("text","")
+        lang = data.get("lang","en")
 
         filename = f"{uuid.uuid4().hex}.mp3"
-        path = os.path.join("/tmp", filename)
+        path = f"/tmp/{filename}"
 
         gTTS(text=text, lang=lang).save(path)
 
@@ -98,27 +88,20 @@ def tts():
 
     except Exception as e:
         print(e)
-        return jsonify({"error":"tts"}), 500
+        return jsonify({"error":"tts fail"}), 500
 
 
-@app.route("/audio/<file>")
-def audio(file):
-    return send_from_directory("/tmp", file)
+@app.route("/audio/<f>")
+def audio(f):
+    return send_from_directory("/tmp", f)
 
 
 # =========================
-# PWA manifest
+# 健康檢查（防 Render 睡眠）
 # =========================
-@app.route("/manifest.json")
-def manifest():
-    return jsonify({
-        "name": "翻譯官",
-        "short_name": "翻譯",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#ffffff",
-        "theme_color": "#1a73e8"
-    })
+@app.route("/health")
+def health():
+    return "ok"
 
 
 if __name__ == "__main__":
