@@ -13,7 +13,8 @@
 body{font-family:sans-serif;background:#f2f4f7;text-align:center;padding:15px;}
 .card{max-width:450px;margin:auto;background:white;padding:20px;border-radius:20px;}
 button{padding:20px;margin:5px;border:none;border-radius:15px;color:white;}
-#btn-me{background:#1a73e8;} #btn-other{background:#34a853;}
+#btn-me{background:#1a73e8;} 
+#btn-other{background:#34a853;}
 </style>
 
 </head>
@@ -40,6 +41,8 @@ button{padding:20px;margin:5px;border:none;border-radius:15px;color:white;}
 
 <script>
 
+let mode="me";
+
 /* 🔥 解鎖手機音訊 */
 document.addEventListener("touchstart", ()=>{
     let u=new SpeechSynthesisUtterance(" ");
@@ -48,46 +51,70 @@ document.addEventListener("touchstart", ()=>{
 },{once:true});
 
 
-/* 🔁 初始化 */
+/* 🔁 fetch timeout（超重要） */
+function fetchTimeout(url, options={}, timeout=8000){
+    return Promise.race([
+        fetch(url, options),
+        new Promise((_, reject)=>
+            setTimeout(()=>reject("timeout"), timeout)
+        )
+    ]);
+}
+
+
+/* 🔁 初始化（防白畫面） */
 async function init(){
     try{
         await loadLangs();
         document.getElementById("status").innerText="準備就緒";
-    }catch{
+    }catch(e){
+        console.log("init error", e);
         setTimeout(init,1000);
     }
 }
 window.onload=init;
 
 
-/* 🌍 語言 */
+/* 🌍 語言（防掛版🔥） */
 async function loadLangs(){
-    const res=await fetch("/languages");
-    const data=await res.json();
+    try{
+        const res=await fetchTimeout("/languages");
+        const data=await res.json();
 
-    const sel=document.getElementById("target");
-    sel.innerHTML="";
+        if(!data || data.length===0) throw "empty";
 
-    data.forEach(l=>{
-        let o=document.createElement("option");
-        o.value=l.name;
-        o.textContent=l.name;
-        o.dataset.v=l.voice;
-        sel.appendChild(o);
-    });
+        const sel=document.getElementById("target");
+        sel.innerHTML="";
+
+        data.forEach(l=>{
+            let o=document.createElement("option");
+            o.value=l.name;
+            o.textContent=l.name;
+            o.dataset.v=l.voice;
+            sel.appendChild(o);
+        });
+
+    }catch(e){
+        console.log("語言載入失敗", e);
+        setTimeout(loadLangs,1000);
+    }
 }
 
 
 /* 🎤 語音 */
-const rec=new(window.SpeechRecognition||webkitSpeechRecognition)();
-let mode="me";
+const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
 
 function runMic(m){
     mode=m;
+
     const sel=document.getElementById("target");
 
-    rec.lang = m==="me"?"zh-TW":sel.selectedOptions[0].dataset.v;
-    rec.start();
+    try{
+        rec.lang = m==="me"?"zh-TW":sel.selectedOptions[0].dataset.v;
+        rec.start();
+    }catch(e){
+        rec.stop();
+    }
 }
 
 
@@ -98,7 +125,7 @@ rec.onresult=async e=>{
     const sel=document.getElementById("target");
 
     try{
-        let res=await fetch("/",{
+        let res=await fetchTimeout("/",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({text,target:sel.value,mode})
@@ -107,18 +134,20 @@ rec.onresult=async e=>{
         let data=await res.json();
         document.getElementById("translated").innerText=data.translatedText;
 
-        speak(data.translatedText, sel.selectedOptions[0].dataset.v);
+        setTimeout(()=>{
+            speak(data.translatedText, sel.selectedOptions[0].dataset.v);
+        },100);
 
-    }catch{
-        document.getElementById("translated").innerText="網路錯誤";
+    }catch(e){
+        document.getElementById("translated").innerText="伺服器忙碌";
     }
 };
 
 
-/* 🔊 TTS */
+/* 🔊 TTS（手機穩定） */
 async function speak(text,lang){
     try{
-        let res=await fetch("/tts",{
+        let res=await fetchTimeout("/tts",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({text,lang:lang.split("-")[0]})
@@ -127,9 +156,14 @@ async function speak(text,lang){
         let data=await res.json();
 
         let audio=new Audio(data.audio_url);
-        setTimeout(()=>audio.play(),120);
 
-    }catch{}
+        setTimeout(()=>{
+            audio.play().catch(()=>{});
+        },120);
+
+    }catch(e){
+        console.log("tts fail", e);
+    }
 }
 
 
@@ -141,5 +175,4 @@ if("serviceWorker" in navigator){
 </script>
 
 </body>
-</html>
 </html>
