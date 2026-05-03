@@ -11,9 +11,6 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-# =========================
-# 主翻譯 API
-# =========================
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "GET":
@@ -66,7 +63,7 @@ def home():
 
 
 # =========================
-# TTS API（穩定版）
+# TTS（手機穩定版）
 # =========================
 @app.route("/tts", methods=["POST"])
 def tts():
@@ -87,21 +84,15 @@ def tts():
         return jsonify({"audio_url": f"/audio/{filename}"})
 
     except Exception as e:
-        print("TTS錯誤:", e)
+        print("TTS error:", e)
         return jsonify({"error": "tts failed"}), 500
 
 
-# =========================
-# 音檔輸出
-# =========================
 @app.route("/audio/<file>")
 def audio(file):
     return send_from_directory("/tmp", file)
 
 
-# =========================
-# Render 啟動
-# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
