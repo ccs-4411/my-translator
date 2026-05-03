@@ -1,175 +1,210 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="manifest" href="/manifest.json">
-
-<title>語音翻譯官</title>
+<title>翻譯官</title>
 
 <style>
-body{font-family:sans-serif;background:#f2f4f7;text-align:center;padding:15px;}
-.card{max-width:450px;margin:auto;background:white;padding:20px;border-radius:20px;}
-button{padding:20px;margin:5px;border:none;border-radius:15px;color:white;}
-#btn-me{background:#1a73e8;} 
-#btn-other{background:#34a853;}
-</style>
+body { font-family:sans-serif; background:#f2f4f7; text-align:center; padding:15px; }
+.card { max-width:450px; margin:auto; background:white; padding:20px; border-radius:25px; }
 
+select { width:100%; padding:12px; font-size:1rem; }
+
+.btn-group { display:flex; gap:10px; margin-top:15px; }
+
+button {
+    flex:1;
+    padding:20px;
+    border:none;
+    border-radius:15px;
+    color:white;
+}
+
+#btn-me { background:#1a73e8; }
+#btn-other { background:#34a853; }
+
+#result {
+    margin-top:15px;
+    background:#f5f5f5;
+    padding:10px;
+    border-radius:10px;
+}
+</style>
 </head>
+
 <body>
 
 <div class="card">
 
 <h2>語音翻譯</h2>
-<div id="status">初始化...</div>
+
+<div id="status">初始化中...</div>
 
 <select id="target"></select>
 
-<div>
-<button id="btn-me" onclick="runMic('me')">🎤 我講</button>
+<div class="btn-group">
+<button id="btn-me" onclick="runMic('me')">🎤 我講中文</button>
 <button id="btn-other" onclick="runMic('other')">🎧 對方</button>
 </div>
 
 <div id="result">
-<div id="original"></div>
-<div id="translated"></div>
+<div id="original">...</div>
+<div id="translated">翻譯結果</div>
 </div>
 
 </div>
 
 <script>
 
-let mode="me";
+let currentMode = "me";
 
-/* 🔥 解鎖手機音訊 */
-document.addEventListener("touchstart", ()=>{
-    let u=new SpeechSynthesisUtterance(" ");
+/* =========================
+   🔥 手機解鎖音訊
+========================= */
+function unlockAudio() {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
     speechSynthesis.speak(u);
     speechSynthesis.cancel();
-},{once:true});
+}
+document.addEventListener("touchstart", unlockAudio, { once: true });
+
+/* =========================
+   初始化（防 LINE / 手機卡）
+========================= */
+async function init() {
+    try {
+        await loadLangs();
+        document.getElementById("status").innerText = "準備就緒";
+    } catch(e) {
+        console.log(e);
+        setTimeout(init, 800);
+    }
+}
+
+window.addEventListener("load", init);
 
 
-/* 🔁 fetch timeout（超重要） */
-function fetchTimeout(url, options={}, timeout=8000){
+/* =========================
+   語言載入
+========================= */
+async function loadLangs() {
+    const sel = document.getElementById("target");
+
+    const res = await fetch("/languages");
+    const data = await res.json();
+
+    sel.innerHTML = "";
+
+    data.forEach(l => {
+        const opt = document.createElement("option");
+        opt.value = l.name;
+        opt.textContent = l.name;
+        opt.dataset.v = l.voice;
+        sel.appendChild(opt);
+    });
+
+    sel.selectedIndex = 0;
+}
+
+
+/* =========================
+   語音辨識
+========================= */
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+
+function runMic(mode) {
+    currentMode = mode;
+
+    const sel = document.getElementById("target");
+
+    recognition.lang = mode === "me"
+        ? "zh-TW"
+        : sel.selectedOptions[0].dataset.v;
+
+    try {
+        recognition.start();
+    } catch(e) {
+        recognition.stop();
+    }
+}
+
+
+/* =========================
+   timeout fetch（手機必備）
+========================= */
+function fetchTimeout(url, opt, t=8000) {
     return Promise.race([
-        fetch(url, options),
-        new Promise((_, reject)=>
-            setTimeout(()=>reject("timeout"), timeout)
-        )
+        fetch(url, opt),
+        new Promise((_, r)=>setTimeout(()=>r("timeout"), t))
     ]);
 }
 
 
-/* 🔁 初始化（防白畫面） */
-async function init(){
-    try{
-        await loadLangs();
-        document.getElementById("status").innerText="準備就緒";
-    }catch(e){
-        console.log("init error", e);
-        setTimeout(init,1000);
-    }
-}
-window.onload=init;
+/* =========================
+   結果處理
+========================= */
+recognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript;
 
+    document.getElementById("original").innerText = text;
 
-/* 🌍 語言（防掛版🔥） */
-async function loadLangs(){
-    try{
-        const res=await fetchTimeout("/languages");
-        const data=await res.json();
+    const sel = document.getElementById("target");
 
-        if(!data || data.length===0) throw "empty";
-
-        const sel=document.getElementById("target");
-        sel.innerHTML="";
-
-        data.forEach(l=>{
-            let o=document.createElement("option");
-            o.value=l.name;
-            o.textContent=l.name;
-            o.dataset.v=l.voice;
-            sel.appendChild(o);
-        });
-
-    }catch(e){
-        console.log("語言載入失敗", e);
-        setTimeout(loadLangs,1000);
-    }
-}
-
-
-/* 🎤 語音 */
-const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
-
-function runMic(m){
-    mode=m;
-
-    const sel=document.getElementById("target");
-
-    try{
-        rec.lang = m==="me"?"zh-TW":sel.selectedOptions[0].dataset.v;
-        rec.start();
-    }catch(e){
-        rec.stop();
-    }
-}
-
-
-rec.onresult=async e=>{
-    let text=e.results[0][0].transcript;
-    document.getElementById("original").innerText=text;
-
-    const sel=document.getElementById("target");
-
-    try{
-        let res=await fetchTimeout("/",{
+    try {
+        const res = await fetchTimeout("/", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({text,target:sel.value,mode})
+            body: JSON.stringify({
+                text,
+                target: sel.value,
+                mode: currentMode
+            })
         });
 
-        let data=await res.json();
-        document.getElementById("translated").innerText=data.translatedText;
+        const data = await res.json();
 
-        setTimeout(()=>{
+        document.getElementById("translated").innerText = data.translatedText;
+
+        setTimeout(() => {
             speak(data.translatedText, sel.selectedOptions[0].dataset.v);
-        },100);
+        }, 100);
 
-    }catch(e){
-        document.getElementById("translated").innerText="伺服器忙碌";
+    } catch(e) {
+        document.getElementById("translated").innerText = "伺服器忙碌";
     }
 };
 
 
-/* 🔊 TTS（手機穩定） */
-async function speak(text,lang){
-    try{
-        let res=await fetchTimeout("/tts",{
+/* =========================
+   🔥 手機穩定 TTS
+========================= */
+async function speak(text, lang) {
+    try {
+        const res = await fetch("/tts", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({text,lang:lang.split("-")[0]})
+            body: JSON.stringify({
+                text,
+                lang: lang.split("-")[0]
+            })
         });
 
-        let data=await res.json();
+        const data = await res.json();
 
-        let audio=new Audio(data.audio_url);
+        const audio = new Audio(data.audio_url);
 
-        setTimeout(()=>{
-            audio.play().catch(()=>{});
-        },120);
+        setTimeout(() => {
+            audio.play().catch(e => {
+                console.log("blocked", e);
+            });
+        }, 120);
 
-    }catch(e){
-        console.log("tts fail", e);
+    } catch(e) {
+        console.log("tts error", e);
     }
-}
-
-
-/* 🔥 PWA */
-if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("/sw.js");
 }
 
 </script>
