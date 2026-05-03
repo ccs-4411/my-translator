@@ -1,27 +1,18 @@
 [
-  {"group":"英文","name":"English (US)","code":"en","voice":"en-US","label":"🇺🇸"},
-  {"group":"英文","name":"English (UK)","code":"en","voice":"en-GB","label":"🇬🇧"},
-  {"group":"英文","name":"English (AU)","code":"en","voice":"en-AU","label":"🇦🇺"},
+  {"group":"英文","name":"英文（美國）","code":"en","voice":"en-US","label":"English 🇺🇸"},
+  {"group":"英文","name":"英文（英國）","code":"en","voice":"en-GB","label":"English 🇬🇧"},
 
-  {"group":"中文","name":"中文（台灣）","code":"zh-TW","voice":"zh-TW","label":"🇹🇼"},
-  {"group":"中文","name":"中文（香港）","code":"zh-TW","voice":"zh-HK","label":"🇭🇰"},
-  {"group":"中文","name":"中文（中國）","code":"zh-CN","voice":"zh-CN","label":"🇨🇳"},
+  {"group":"中文","name":"中文（台灣）","code":"zh-TW","voice":"zh-TW","label":"繁體中文 🇹🇼"},
+  {"group":"中文","name":"中文（香港）","code":"zh-TW","voice":"zh-HK","label":"繁體中文 🇭🇰"},
 
-  {"group":"日韓","name":"日本語","code":"ja","voice":"ja-JP","label":"🇯🇵"},
-  {"group":"日韓","name":"한국어","code":"ko","voice":"ko-KR","label":"🇰🇷"},
+  {"group":"日韓","name":"日文","code":"ja","voice":"ja-JP","label":"日本語 🇯🇵"},
+  {"group":"日韓","name":"韓文","code":"ko","voice":"ko-KR","label":"한국어 🇰🇷"},
 
-  {"group":"東南亞","name":"Tiếng Việt","code":"vi","voice":"vi-VN","label":"🇻🇳"},
-  {"group":"東南亞","name":"ภาษาไทย","code":"th","voice":"th-TH","label":"🇹🇭"},
-  {"group":"東南亞","name":"Bahasa Indonesia","code":"id","voice":"id-ID","label":"🇮🇩"},
-  {"group":"東南亞","name":"Filipino","code":"tl","voice":"tl-PH","label":"🇵🇭"},
+  {"group":"歐洲","name":"西班牙文","code":"es","voice":"es-ES","label":"Español 🇪🇸"},
+  {"group":"歐洲","name":"法文","code":"fr","voice":"fr-FR","label":"Français 🇫🇷"},
+  {"group":"歐洲","name":"德文","code":"de","voice":"de-DE","label":"Deutsch 🇩🇪"},
+  {"group":"歐洲","name":"義大利文","code":"it","voice":"it-IT","label":"Italiano 🇮🇹"},
 
-  {"group":"歐洲","name":"Español","code":"es","voice":"es-ES","label":"🇪🇸"},
-  {"group":"歐洲","name":"Français","code":"fr","voice":"fr-FR","label":"🇫🇷"},
-  {"group":"歐洲","name":"Deutsch","code":"de","voice":"de-DE","label":"🇩🇪"},
-  {"group":"歐洲","name":"Italiano","code":"it","voice":"it-IT","label":"🇮🇹"},
-  {"group":"歐洲","name":"Русский","code":"ru","voice":"ru-RU","label":"🇷🇺"},
-  {"group":"歐洲","name":"Português","code":"pt","voice":"pt-PT","label":"🇵🇹"},
-
-  {"group":"其他","name":"العربية","code":"ar","voice":"ar-SA","label":"🇸🇦"},
-  {"group":"其他","name":"हिन्दी","code":"hi","voice":"hi-IN","label":"🇮🇳"}
+  {"group":"東南亞","name":"越南文","code":"vi","voice":"vi-VN","label":"Tiếng Việt 🇻🇳"},
+  {"group":"東南亞","name":"泰文","code":"th","voice":"th-TH","label":"ภาษาไทย 🇹🇭"}
 ]
