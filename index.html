@@ -116,7 +116,7 @@ let LANGS = [];
 let voices = [];
 
 /* =========================
-   🔥 iPhone 音訊解鎖
+   🔥 iPhone 解鎖音訊
 ========================= */
 function unlockAudio() {
     const u = new SpeechSynthesisUtterance(" ");
@@ -135,6 +135,8 @@ async function loadLanguages() {
 
     const sel = document.getElementById("target");
     sel.innerHTML = "";
+
+    const savedLang = localStorage.getItem("targetLang");
 
     const groups = {};
 
@@ -158,24 +160,34 @@ async function loadLanguages() {
         sel.appendChild(optgroup);
     }
 
+    if (savedLang) {
+        sel.value = savedLang;
+    }
+
     updateLabel();
 }
 
 /* =========================
-   更新 UI
+   UI 更新
 ========================= */
 function updateLabel() {
     const sel = document.getElementById("target");
     document.getElementById("target-name").innerText = sel.value;
+
+    localStorage.setItem("targetLang", sel.value);
 }
 
 /* =========================
-   Speech Recognition
+   語音辨識
 ========================= */
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
 function runMic(mode) {
     const sel = document.getElementById("target");
+
+    try {
+        recognition.abort();
+    } catch {}
 
     recognition.lang = mode === "me"
         ? "zh-TW"
@@ -186,7 +198,7 @@ function runMic(mode) {
 
     document.getElementById("status").innerText = "🎤 聆聽中...";
 
-    try { recognition.start(); } catch(e) { recognition.stop(); }
+    recognition.start();
 }
 
 recognition.onend = () => {
@@ -194,8 +206,13 @@ recognition.onend = () => {
         .forEach(b => b.classList.remove('active'));
 };
 
+recognition.onerror = (e) => {
+    console.log("語音錯誤:", e.error);
+    document.getElementById("status").innerText = "❌ 語音錯誤：" + e.error;
+};
+
 /* =========================
-   翻譯 + 語音
+   翻譯
 ========================= */
 recognition.onresult = (e) => {
     const text = e.results[0][0].transcript;
@@ -204,7 +221,7 @@ recognition.onresult = (e) => {
 
     const sel = document.getElementById("target");
 
-    fetch("/", {
+    fetch("/translate", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -217,29 +234,33 @@ recognition.onresult = (e) => {
     .then(data => {
         document.getElementById("translated").innerText = data.translatedText;
 
-        // 🔥 iPhone 穩定播放
-        setTimeout(() => {
-            speak(data.translatedText, sel.selectedOptions[0].dataset.v);
-        }, 80);
+        speak(data.translatedText, sel.selectedOptions[0].dataset.v);
     });
 };
 
 /* =========================
-   🔥 修正版 Speak（穩定）
+   🔥 穩定語音播放（已修）
 ========================= */
 function speak(text, lang) {
     speechSynthesis.cancel();
 
-    const msg = new SpeechSynthesisUtterance(text);
+    setTimeout(() => {
+        const msg = new SpeechSynthesisUtterance(text);
 
-    msg.lang = lang;
-    msg.rate = 1;
+        const voice = voices.find(v => v.lang === lang);
+        if (voice) {
+            msg.voice = voice;
+        } else {
+            msg.lang = lang;
+        }
 
-    speechSynthesis.speak(msg);
+        msg.rate = 1;
+        speechSynthesis.speak(msg);
+    }, 120);
 }
 
 /* =========================
-   啟動 voices（iOS 用）
+   voices 載入
 ========================= */
 speechSynthesis.onvoiceschanged = () => {
     voices = speechSynthesis.getVoices();
