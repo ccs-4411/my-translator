@@ -8,8 +8,6 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# ===== 載入語言 =====
 LANG_FILE = "languages.json"
 
 def load_languages():
@@ -26,20 +24,20 @@ def get_lang_code(name):
             return lang["code"]
     return "en"
 
-# ===== API =====
 @app.route("/languages")
-def languages():
+def get_langs():
     return jsonify(LANGUAGES)
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    if request.method == "GET":
-        return send_from_directory(BASE_DIR, "index.html")
+@app.route("/")
+def index():
+    return send_from_directory(BASE_DIR, "index.html")
 
+@app.route("/translate", methods=["POST"])
+def translate():
     try:
         data = request.get_json()
         text = data.get("text", "").strip()
-        target_name = data.get("target", "英文")
+        target_name = data.get("target", "")
         mode = data.get("mode", "me")
 
         if not text:
@@ -47,6 +45,9 @@ def home():
 
         target_code = get_lang_code(target_name)
 
+        # 模式邏輯：
+        # me: 我講中文 -> 翻譯成外語 (source: zh-TW, target: 外語)
+        # other: 對方講外語 -> 翻譯成中文 (source: 外語, target: zh-TW)
         if mode == "other":
             source = target_code
             target = "zh-TW"
@@ -55,14 +56,11 @@ def home():
             target = target_code
 
         result = GoogleTranslator(source=source, target=target).translate(text)
-
         return jsonify({"translatedText": result})
 
     except Exception as e:
-        print("錯誤:", e)
+        print("翻譯錯誤:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
+    app.run(host="0.0.0.0", port=5000, debug=True)
