@@ -1,6 +1,5 @@
 [
-  {"group":"中文","name":"中文（台灣）","code":"zh-TW","voice":"zh-TW","label":"繁體中文 🇹🇼"},
-  {"group":"中文","name":"中文（香港）","code":"zh-TW","voice":"zh-HK","label":"繁體中文 🇭🇰"},
+   {"group":"中文","name":"中文（香港）","code":"zh-TW","voice":"zh-HK","label":"繁體中文 🇭🇰"},
 
   {"group":"英文","name":"英文（美國）","code":"en","voice":"en-US","label":"English 🇺🇸"},
   {"group":"英文","name":"英文（英國）","code":"en","voice":"en-GB","label":"English 🇬🇧"},
