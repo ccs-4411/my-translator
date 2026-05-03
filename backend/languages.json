@@ -1,0 +1,23 @@
+[
+   {"group":"中文","name":"中文（香港）","code":"zh-TW","voice":"zh-HK","label":"繁體中文 🇭🇰"},
+
+  {"group":"英文","name":"英文（美國）","code":"en","voice":"en-US","label":"English 🇺🇸"},
+  {"group":"英文","name":"英文（英國）","code":"en","voice":"en-GB","label":"English 🇬🇧"},
+
+  {"group":"日韓","name":"日文","code":"ja","voice":"ja-JP","label":"日本語 🇯🇵"},
+  {"group":"日韓","name":"韓文","code":"ko","voice":"ko-KR","label":"한국어 🇰🇷"},
+
+  {"group":"東南亞","name":"越南文","code":"vi","voice":"vi-VN","label":"Tiếng Việt 🇻🇳"},
+  {"group":"東南亞","name":"泰文","code":"th","voice":"th-TH","label":"ภาษาไทย 🇹🇭"},
+
+  {"group":"歐洲","name":"西班牙文","code":"es","voice":"es-ES","label":"Español 🇪🇸"},
+  {"group":"歐洲","name":"法文","code":"fr","voice":"fr-FR","label":"Français 🇫🇷"},
+  {"group":"歐洲","name":"德文","code":"de","voice":"de-DE","label":"Deutsch 🇩🇪"},
+  {"group":"歐洲","name":"義大利文","code":"it","voice":"it-IT","label":"Italiano 🇮🇹"},
+  {"group":"歐洲","name":"捷克文","code":"cs","voice":"cs-CZ","label":"Čeština 🇨🇿"},
+  {"group":"歐洲","name":"丹麥文","code":"da","voice":"da-DK","label":"Dansk 🇩🇰"},
+  {"group":"歐洲","name":"芬蘭文","code":"fi","voice":"fi-FI","label":"Suomi 🇫🇮"},
+  {"group":"歐洲","name":"瑞典文","code":"sv","voice":"sv-SE","label":"Svenska 🇸🇪"},
+
+  {"group":"其他","name":"英文（預設）","code":"en","voice":"en-US","label":"Fallback 🇺🇸"}
+]
