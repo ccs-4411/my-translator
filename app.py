@@ -1,11 +1,10 @@
-import os
-import uuid
+import os, uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 from gtts import gTTS
 
-# 🔥 正確 static（解決 /static 404）
+# 🔥 正確 static 設定（解決 icon 404）
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
@@ -13,7 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # =========================
-# 首頁（一定要支援 GET，避免 405）
+# 前端首頁
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def home():
@@ -21,7 +20,7 @@ def home():
         return send_from_directory(BASE_DIR, "index.html")
 
     try:
-        # 🔥 防 415
+        # 🔥 修正 415 錯誤
         data = request.get_json(silent=True)
         if not data:
             return jsonify({"translatedText": ""})
@@ -121,7 +120,7 @@ def audio(filename):
 
 
 # =========================
-# 🔥 static（保險）
+# 🔥 static（保險用，避免 404）
 # =========================
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -129,7 +128,7 @@ def static_files(filename):
 
 
 # =========================
-# 健康檢查（Render）
+# 健康檢查（防 Render 睡眠）
 # =========================
 @app.route("/health")
 def health():
@@ -137,7 +136,7 @@ def health():
 
 
 # =========================
-# 啟動
+# 主程式
 # =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
