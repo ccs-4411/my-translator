@@ -4,15 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>翻譯官</title>
+<title>語音翻譯</title>
 
 <style>
-body { font-family:sans-serif; background:#f2f4f7; text-align:center; padding:15px; }
-.card { max-width:450px; margin:auto; background:white; padding:20px; border-radius:25px; }
+body {
+    font-family: sans-serif;
+    background:#f2f4f7;
+    text-align:center;
+    padding:15px;
+}
 
-select { width:100%; padding:12px; font-size:1rem; }
+.card {
+    max-width:450px;
+    margin:auto;
+    background:white;
+    padding:20px;
+    border-radius:25px;
+}
 
-.btn-group { display:flex; gap:10px; margin-top:15px; }
+select {
+    width:100%;
+    padding:12px;
+    font-size:1rem;
+}
+
+.btn-group {
+    display:flex;
+    gap:10px;
+    margin-top:15px;
+}
 
 button {
     flex:1;
@@ -40,7 +60,7 @@ button {
 
 <h2>語音翻譯</h2>
 
-<div id="status">初始化中...</div>
+<div id="status">載入中...</div>
 
 <select id="target"></select>
 
@@ -61,18 +81,26 @@ button {
 let currentMode = "me";
 
 /* =========================
+   🔥 Safari / iPhone 防白畫面
+========================= */
+window.addEventListener("error", () => {
+    document.body.innerHTML = "載入失敗，請重新整理";
+});
+
+
+/* =========================
    🔥 手機解鎖音訊
 ========================= */
-function unlockAudio() {
+document.addEventListener("touchstart", () => {
     const u = new SpeechSynthesisUtterance(" ");
     u.volume = 0;
     speechSynthesis.speak(u);
     speechSynthesis.cancel();
-}
-document.addEventListener("touchstart", unlockAudio, { once: true });
+}, { once:true });
+
 
 /* =========================
-   初始化（防 LINE / 手機卡）
+   初始化（防 LINE / iPhone）
 ========================= */
 async function init() {
     try {
@@ -88,12 +116,12 @@ window.addEventListener("load", init);
 
 
 /* =========================
-   語言載入
+   載入語言（防卡）
 ========================= */
 async function loadLangs() {
     const sel = document.getElementById("target");
 
-    const res = await fetch("/languages");
+    const res = await safeFetch("/languages");
     const data = await res.json();
 
     sel.innerHTML = "";
@@ -107,6 +135,17 @@ async function loadLangs() {
     });
 
     sel.selectedIndex = 0;
+}
+
+
+/* =========================
+   timeout fetch（手機必備）
+========================= */
+function safeFetch(url, opt, t=8000) {
+    return Promise.race([
+        fetch(url, opt),
+        new Promise((_, r)=>setTimeout(()=>r("timeout"), t))
+    ]);
 }
 
 
@@ -133,18 +172,7 @@ function runMic(mode) {
 
 
 /* =========================
-   timeout fetch（手機必備）
-========================= */
-function fetchTimeout(url, opt, t=8000) {
-    return Promise.race([
-        fetch(url, opt),
-        new Promise((_, r)=>setTimeout(()=>r("timeout"), t))
-    ]);
-}
-
-
-/* =========================
-   結果處理
+   結果
 ========================= */
 recognition.onresult = async (e) => {
     const text = e.results[0][0].transcript;
@@ -154,7 +182,7 @@ recognition.onresult = async (e) => {
     const sel = document.getElementById("target");
 
     try {
-        const res = await fetchTimeout("/", {
+        const res = await safeFetch("/", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body: JSON.stringify({
@@ -173,13 +201,13 @@ recognition.onresult = async (e) => {
         }, 100);
 
     } catch(e) {
-        document.getElementById("translated").innerText = "伺服器忙碌";
+        document.getElementById("translated").innerText = "伺服器忙";
     }
 };
 
 
 /* =========================
-   🔥 手機穩定 TTS
+   TTS（穩定播放）
 ========================= */
 async function speak(text, lang) {
     try {
@@ -197,17 +225,18 @@ async function speak(text, lang) {
         const audio = new Audio(data.audio_url);
 
         setTimeout(() => {
-            audio.play().catch(e => {
-                console.log("blocked", e);
-            });
+            audio.play().catch(()=>{});
         }, 120);
 
     } catch(e) {
-        console.log("tts error", e);
+        console.log(e);
     }
 }
 
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
