@@ -1,32 +1,26 @@
-import os, uuid
+import os
+import uuid
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 from gtts import gTTS
 
-# 🔥 正確 static 設定（解決 icon 404）
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-# =========================
-# 前端首頁
-# =========================
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "GET":
         return send_from_directory(BASE_DIR, "index.html")
 
     try:
-        # 🔥 修正 415 錯誤
-        data = request.get_json(silent=True)
-        if not data:
-            return jsonify({"translatedText": ""})
+        data = request.get_json()
 
         text = data.get("text", "").strip()
-        target = data.get("target", "英文")
+        target_name = data.get("target", "英文")
         mode = data.get("mode", "me")
 
         if not text:
@@ -36,108 +30,69 @@ def home():
             "英文": "en",
             "日文": "ja",
             "韓文": "ko",
+            "越南文": "vi",
             "西班牙文": "es",
+            "泰文": "th",
             "法文": "fr",
             "德文": "de",
-            "泰文": "th",
-            "越南文": "vi"
+            "印尼文": "id",
+            "俄文": "ru",
+            "義大利文": "it",
+            "菲律賓文": "tl"
         }
 
-        target_code = codes.get(target, "en")
+        target_lang_code = codes.get(target_name, "en")
 
         if mode == "other":
-            source_lang = target_code
+            source_lang = target_lang_code
             target_lang = "zh-TW"
         else:
             source_lang = "zh-TW"
-            target_lang = target_code
+            target_lang = target_lang_code
 
         translated = GoogleTranslator(
             source=source_lang,
             target=target_lang
         ).translate(text)
 
-        print(f"[翻譯] {text} → {translated}")
-
         return jsonify({"translatedText": translated})
 
     except Exception as e:
         print("翻譯錯誤:", e)
-        return jsonify({"translatedText": "翻譯失敗"}), 500
+        return jsonify({"translatedText": "翻譯錯誤"}), 500
 
 
 # =========================
-# 語言 API
-# =========================
-@app.route("/languages")
-def languages():
-    return jsonify([
-        {"name": "英文", "voice": "en-US"},
-        {"name": "日文", "voice": "ja-JP"},
-        {"name": "韓文", "voice": "ko-KR"},
-        {"name": "西班牙文", "voice": "es-ES"},
-        {"name": "法文", "voice": "fr-FR"},
-        {"name": "德文", "voice": "de-DE"},
-        {"name": "泰文", "voice": "th-TH"},
-        {"name": "越南文", "voice": "vi-VN"}
-    ])
-
-
-# =========================
-# 🔊 TTS（語音）
+# TTS（手機穩定版）
 # =========================
 @app.route("/tts", methods=["POST"])
 def tts():
     try:
-        data = request.get_json(silent=True)
-        if not data:
-            return jsonify({"error": "no data"}), 400
-
+        data = request.get_json()
         text = data.get("text", "")
         lang = data.get("lang", "en")
 
         if not text:
-            return jsonify({"error": "empty"}), 400
+            return jsonify({"error": "no text"}), 400
 
         filename = f"{uuid.uuid4().hex}.mp3"
-        path = f"/tmp/{filename}"
+        path = os.path.join("/tmp", filename)
 
-        gTTS(text=text, lang=lang).save(path)
+        tts = gTTS(text=text, lang=lang)
+        tts.save(path)
 
         return jsonify({"audio_url": f"/audio/{filename}"})
 
     except Exception as e:
-        print("TTS錯誤:", e)
-        return jsonify({"error": "tts fail"}), 500
+        print("TTS error:", e)
+        return jsonify({"error": "tts failed"}), 500
 
 
-# =========================
-# 播放音檔
-# =========================
-@app.route("/audio/<filename>")
-def audio(filename):
-    return send_from_directory("/tmp", filename)
+@app.route("/audio/<file>")
+def audio(file):
+    return send_from_directory("/tmp", file)
 
 
-# =========================
-# 🔥 static（保險用，避免 404）
-# =========================
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_from_directory('static', filename)
-
-
-# =========================
-# 健康檢查（防 Render 睡眠）
-# =========================
-@app.route("/health")
-def health():
-    return "ok"
-
-
-# =========================
-# 主程式
-# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
