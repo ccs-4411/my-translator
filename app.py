@@ -11,6 +11,9 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+# =========================
+# 主頁
+# =========================
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "GET":
@@ -63,7 +66,24 @@ def home():
 
 
 # =========================
-# TTS（手機穩定版）
+# 🔥 languages（iPhone 白畫面關鍵修復）
+# =========================
+@app.route("/languages")
+def languages():
+    return jsonify([
+        {"group":"亞洲","name":"英文","voice":"en-US","label":"English 🇺🇸"},
+        {"group":"亞洲","name":"日文","voice":"ja-JP","label":"日本語 🇯🇵"},
+        {"group":"亞洲","name":"韓文","voice":"ko-KR","label":"한국어 🇰🇷"},
+        {"group":"歐洲","name":"法文","voice":"fr-FR","label":"Français 🇫🇷"},
+        {"group":"歐洲","name":"德文","voice":"de-DE","label":"Deutsch 🇩🇪"},
+        {"group":"歐洲","name":"西班牙文","voice":"es-ES","label":"Español 🇪🇸"},
+        {"group":"亞洲","name":"越南文","voice":"vi-VN","label":"Tiếng Việt 🇻🇳"},
+        {"group":"亞洲","name":"泰文","voice":"th-TH","label":"ไทย 🇹🇭"}
+    ])
+
+
+# =========================
+# TTS（穩定）
 # =========================
 @app.route("/tts", methods=["POST"])
 def tts():
@@ -78,8 +98,7 @@ def tts():
         filename = f"{uuid.uuid4().hex}.mp3"
         path = os.path.join("/tmp", filename)
 
-        tts = gTTS(text=text, lang=lang)
-        tts.save(path)
+        gTTS(text=text, lang=lang).save(path)
 
         return jsonify({"audio_url": f"/audio/{filename}"})
 
@@ -93,6 +112,9 @@ def audio(file):
     return send_from_directory("/tmp", file)
 
 
+# =========================
+# Render 啟動
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
