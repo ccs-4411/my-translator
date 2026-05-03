@@ -2,46 +2,158 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 翻譯官</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>語音翻譯官</title>
 
 <style>
-body { font-family: sans-serif; background:#f2f4f7; margin:0; padding:15px; }
-.card { max-width:450px; margin:auto; background:#fff; padding:20px; border-radius:20px; }
+body {
+    font-family: -apple-system, "Microsoft JhengHei", sans-serif;
+    background:#f2f4f7;
+    margin:0;
+    padding:15px;
+    text-align:center;
+}
 
-select, button { width:100%; padding:12px; margin:5px 0; border-radius:10px; border:1px solid #ddd; }
+.card {
+    max-width:450px;
+    margin:auto;
+    background:white;
+    padding:25px;
+    border-radius:30px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.1);
+}
 
-#result { margin-top:15px; padding:15px; background:#f8f9fa; border-radius:10px; }
+h2 { color:#1a73e8; }
 
-.lang-item { padding:10px; border-bottom:1px solid #eee; cursor:pointer; }
-.lang-item:hover { background:#f0f0f0; }
+#status {
+    font-size:0.85rem;
+    color:#888;
+    margin-bottom:10px;
+}
 
-#modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); }
-.modal-body { background:#fff; margin:10% auto; width:80%; padding:20px; border-radius:15px; }
+.select-container {
+    display:flex;
+    gap:10px;
+    margin-bottom:15px;
+}
+
+select {
+    flex:1;
+    padding:12px;
+    border-radius:12px;
+    border:1px solid #ddd;
+    font-size:1rem;
+}
+
+.add-btn {
+    width:55px;
+    border:none;
+    border-radius:12px;
+    background:#e8f0fe;
+    font-size:1.5rem;
+}
+
+.btn-group {
+    display:flex;
+    gap:10px;
+    margin:20px 0;
+}
+
+.mic-btn {
+    flex:1;
+    height:110px;
+    border:none;
+    border-radius:20px;
+    color:white;
+    font-size:1.1rem;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+}
+
+#btn-me { background:#1a73e8; }
+#btn-other { background:#34a853; }
+
+.mic-btn.active {
+    background:#ea4335 !important;
+}
+
+#result-box {
+    background:#f8f9fa;
+    border-radius:20px;
+    padding:15px;
+    text-align:left;
+}
+
+#original { color:#888; margin-bottom:8px; }
+#translated { font-size:1.5rem; font-weight:bold; }
+
+#modal {
+    display:none;
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(0,0,0,0.6);
+}
+
+.modal-body {
+    background:white;
+    width:85%;
+    margin:10% auto;
+    padding:20px;
+    border-radius:20px;
+    max-height:70vh;
+    overflow-y:auto;
+}
+
+.lang-item {
+    padding:12px;
+    border-bottom:1px solid #eee;
+    cursor:pointer;
+}
+.lang-item:hover { background:#f0f2f5; }
 </style>
 </head>
 
 <body>
 
 <div class="card">
-<h2>語音翻譯</h2>
+<h2>語音翻譯官</h2>
+<div id="status">準備就緒</div>
 
-<select id="target"></select>
-<button onclick="toggleModal(true)">選擇語言</button>
+<div class="select-container">
+<select id="target" onchange="updateLabel()"></select>
+<button class="add-btn" onclick="toggleModal(true)">＋</button>
+</div>
 
-<button onclick="runMic('me')">🎤 我講</button>
-<button onclick="runMic('other')">🎧 對方講</button>
+<div class="btn-group">
+<button id="btn-me" class="mic-btn" onclick="runMic('me')">
+🎤 我講中文
+</button>
 
-<div id="result">
-<div id="original"></div>
-<div id="translated"></div>
+<button id="btn-other" class="mic-btn" onclick="runMic('other')">
+🎧 對方講 <span id="target-name"></span>
+</button>
+</div>
+
+<div id="result-box">
+<div id="original">...</div>
+<div id="translated">翻譯結果</div>
 </div>
 </div>
 
+<!-- Modal -->
 <div id="modal" onclick="toggleModal(false)">
 <div class="modal-body" onclick="event.stopPropagation()">
-<input id="search" placeholder="搜尋語言...">
+
+<input id="search" placeholder="搜尋語言..." style="width:100%;padding:10px;margin-bottom:10px;border-radius:10px;border:1px solid #ddd;">
+
 <div id="lang-list"></div>
+
+<button onclick="toggleModal(false)" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:10px;background:#eee;">關閉</button>
+
 </div>
 </div>
 
@@ -63,14 +175,29 @@ async function loadLanguages() {
         sel.appendChild(opt);
     });
 
+    const saved = localStorage.getItem("lang");
+    if(saved) sel.value = saved;
+
+    updateLabel();
     renderLangList();
+}
+
+function updateLabel() {
+    const val = document.getElementById('target').value;
+    document.getElementById('target-name').innerText = val;
+    localStorage.setItem("lang", val);
+}
+
+function toggleModal(show) {
+    document.getElementById("modal").style.display = show ? "block" : "none";
 }
 
 function renderLangList(filter="") {
     const list = document.getElementById("lang-list");
     list.innerHTML = "";
 
-    LANGS.filter(l => l.name.includes(filter))
+    LANGS
+    .filter(l => l.name.includes(filter) || l.label.toLowerCase().includes(filter))
     .forEach(l => {
         const div = document.createElement("div");
         div.className = "lang-item";
@@ -86,42 +213,72 @@ document.getElementById("search").oninput = e => {
 
 function selectLang(name) {
     document.getElementById("target").value = name;
-    localStorage.setItem("lang", name);
+    updateLabel();
     toggleModal(false);
-}
-
-function toggleModal(show) {
-    document.getElementById("modal").style.display = show ? "block" : "none";
 }
 
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
 function runMic(mode) {
     const sel = document.getElementById("target");
-    recognition.lang = mode === "me" ? "zh-TW" : sel.selectedOptions[0].dataset.v;
 
-    recognition.start();
+    recognition.lang = mode === "me"
+        ? "zh-TW"
+        : sel.selectedOptions[0].dataset.v;
 
-    recognition.onresult = async (e) => {
-        const text = e.results[0][0].transcript;
-        document.getElementById("original").innerText = text;
+    document.getElementById(mode === 'me' ? 'btn-me' : 'btn-other')
+        .classList.add('active');
 
+    document.getElementById("status").innerText = "🎤 聆聽中...";
+
+    try { recognition.start(); } catch(e) { recognition.stop(); }
+}
+
+recognition.onend = () => {
+    document.querySelectorAll('.mic-btn')
+        .forEach(b => b.classList.remove('active'));
+};
+
+recognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript;
+    if(!text) return;
+
+    document.getElementById("original").innerText = text;
+    document.getElementById("status").innerText = "翻譯中...";
+
+    const sel = document.getElementById("target");
+
+    try {
         const res = await fetch("/", {
             method:"POST",
             headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({text, target:sel.value, mode})
+            body:JSON.stringify({
+                text,
+                target:sel.value,
+                mode: (recognition.lang === "zh-TW") ? "me" : "other"
+            })
         });
 
         const data = await res.json();
         document.getElementById("translated").innerText = data.translatedText;
 
-        speak(data.translatedText, sel.selectedOptions[0].dataset.v);
-    };
-}
+        speak(data.translatedText,
+            sel.selectedOptions[0].dataset.v
+        );
+
+        document.getElementById("status").innerText = "完成";
+    } catch(err) {
+        document.getElementById("translated").innerText = "翻譯失敗";
+    }
+};
 
 function speak(text, lang) {
+    window.speechSynthesis.cancel();
+
     const msg = new SpeechSynthesisUtterance(text);
     msg.lang = lang;
+    msg.rate = 1;
+
     speechSynthesis.speak(msg);
 }
 
