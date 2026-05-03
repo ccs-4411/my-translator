@@ -4,6 +4,7 @@ from flask_cors import CORS
 from deep_translator import GoogleTranslator
 from gtts import gTTS
 
+# 🔥 正確 static 設定（解決 icon 404）
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
@@ -11,73 +12,92 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # =========================
-# 前端
+# 前端首頁
 # =========================
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_from_directory('static', filename)
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "GET":
+        return send_from_directory(BASE_DIR, "index.html")
+
+    try:
+        # 🔥 修正 415 錯誤
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"translatedText": ""})
+
+        text = data.get("text", "").strip()
+        target = data.get("target", "英文")
+        mode = data.get("mode", "me")
+
+        if not text:
+            return jsonify({"translatedText": ""})
+
+        codes = {
+            "英文": "en",
+            "日文": "ja",
+            "韓文": "ko",
+            "西班牙文": "es",
+            "法文": "fr",
+            "德文": "de",
+            "泰文": "th",
+            "越南文": "vi"
+        }
+
+        target_code = codes.get(target, "en")
+
+        if mode == "other":
+            source_lang = target_code
+            target_lang = "zh-TW"
+        else:
+            source_lang = "zh-TW"
+            target_lang = target_code
+
+        translated = GoogleTranslator(
+            source=source_lang,
+            target=target_lang
+        ).translate(text)
+
+        print(f"[翻譯] {text} → {translated}")
+
+        return jsonify({"translatedText": translated})
+
+    except Exception as e:
+        print("翻譯錯誤:", e)
+        return jsonify({"translatedText": "翻譯失敗"}), 500
 
 
 # =========================
-# 語言
+# 語言 API
 # =========================
 @app.route("/languages")
 def languages():
     return jsonify([
-        {"name":"英文","voice":"en-US"},
-        {"name":"日文","voice":"ja-JP"},
-        {"name":"韓文","voice":"ko-KR"},
-        {"name":"西班牙文","voice":"es-ES"},
-        {"name":"法文","voice":"fr-FR"},
-        {"name":"德文","voice":"de-DE"},
-        {"name":"泰文","voice":"th-TH"},
-        {"name":"越南文","voice":"vi-VN"}
+        {"name": "英文", "voice": "en-US"},
+        {"name": "日文", "voice": "ja-JP"},
+        {"name": "韓文", "voice": "ko-KR"},
+        {"name": "西班牙文", "voice": "es-ES"},
+        {"name": "法文", "voice": "fr-FR"},
+        {"name": "德文", "voice": "de-DE"},
+        {"name": "泰文", "voice": "th-TH"},
+        {"name": "越南文", "voice": "vi-VN"}
     ])
 
 
 # =========================
-# 翻譯
-# =========================
-@app.route("/", methods=["POST"])
-def translate():
-    try:
-        data = request.get_json()
-        text = data.get("text","")
-        target = data.get("target","英文")
-        mode = data.get("mode","me")
-
-        codes = {
-            "英文":"en","日文":"ja","韓文":"ko","西班牙文":"es",
-            "法文":"fr","德文":"de","泰文":"th","越南文":"vi"
-        }
-
-        target_code = codes.get(target,"en")
-
-        if mode == "other":
-            src = target_code
-            tgt = "zh-TW"
-        else:
-            src = "zh-TW"
-            tgt = target_code
-
-        result = GoogleTranslator(source=src, target=tgt).translate(text)
-
-        return jsonify({"translatedText": result})
-
-    except Exception as e:
-        print(e)
-        return jsonify({"translatedText":"錯誤"}), 500
-
-
-# =========================
-# TTS
+# 🔊 TTS（語音）
 # =========================
 @app.route("/tts", methods=["POST"])
 def tts():
     try:
-        data = request.get_json()
-        text = data.get("text","")
-        lang = data.get("lang","en")
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "no data"}), 400
+
+        text = data.get("text", "")
+        lang = data.get("lang", "en")
+
+        if not text:
+            return jsonify({"error": "empty"}), 400
 
         filename = f"{uuid.uuid4().hex}.mp3"
         path = f"/tmp/{filename}"
@@ -87,13 +107,24 @@ def tts():
         return jsonify({"audio_url": f"/audio/{filename}"})
 
     except Exception as e:
-        print(e)
-        return jsonify({"error":"tts fail"}), 500
+        print("TTS錯誤:", e)
+        return jsonify({"error": "tts fail"}), 500
 
 
-@app.route("/audio/<f>")
-def audio(f):
-    return send_from_directory("/tmp", f)
+# =========================
+# 播放音檔
+# =========================
+@app.route("/audio/<filename>")
+def audio(filename):
+    return send_from_directory("/tmp", filename)
+
+
+# =========================
+# 🔥 static（保險用，避免 404）
+# =========================
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
 
 
 # =========================
@@ -104,6 +135,9 @@ def health():
     return "ok"
 
 
+# =========================
+# 主程式
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
