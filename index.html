@@ -4,35 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>語音翻譯</title>
+<title>翻譯官</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
 
 <style>
-body {
-    font-family: sans-serif;
-    background:#f2f4f7;
-    text-align:center;
-    padding:15px;
-}
+body { font-family:sans-serif; background:#f2f4f7; text-align:center; padding:15px; }
+.card { max-width:450px; margin:auto; background:white; padding:20px; border-radius:20px; }
 
-.card {
-    max-width:450px;
-    margin:auto;
-    background:white;
-    padding:20px;
-    border-radius:25px;
-}
+select { width:100%; padding:12px; font-size:1rem; }
 
-select {
-    width:100%;
-    padding:12px;
-    font-size:1rem;
-}
-
-.btn-group {
-    display:flex;
-    gap:10px;
-    margin-top:15px;
-}
+.btn-group { display:flex; gap:10px; margin-top:15px; }
 
 button {
     flex:1;
@@ -78,18 +61,20 @@ button {
 
 <script>
 
-let currentMode = "me";
-
 /* =========================
-   🔥 Safari / iPhone 防白畫面
+   🔥 LINE / Safari 修正
 ========================= */
-window.addEventListener("error", () => {
-    document.body.innerHTML = "載入失敗，請重新整理";
-});
+(function () {
+    const url = new URL(window.location.href);
+    ["openExternalBrowser","from","utm_source"].forEach(k=>{
+        url.searchParams.delete(k);
+    });
+    window.history.replaceState({}, "", url.pathname);
+})();
 
 
 /* =========================
-   🔥 手機解鎖音訊
+   iOS unlock audio
 ========================= */
 document.addEventListener("touchstart", () => {
     const u = new SpeechSynthesisUtterance(" ");
@@ -100,143 +85,124 @@ document.addEventListener("touchstart", () => {
 
 
 /* =========================
-   初始化（防 LINE / iPhone）
+   init
 ========================= */
+window.addEventListener("load", init);
+
 async function init() {
     try {
         await loadLangs();
-        document.getElementById("status").innerText = "準備就緒";
+        document.getElementById("status").innerText = "準備完成";
     } catch(e) {
-        console.log(e);
         setTimeout(init, 800);
     }
 }
 
-window.addEventListener("load", init);
-
 
 /* =========================
-   載入語言（防卡）
+   languages
 ========================= */
 async function loadLangs() {
     const sel = document.getElementById("target");
 
-    const res = await safeFetch("/languages");
+    const res = await fetch("/languages");
     const data = await res.json();
 
     sel.innerHTML = "";
 
-    data.forEach(l => {
+    data.forEach(l=>{
         const opt = document.createElement("option");
         opt.value = l.name;
         opt.textContent = l.name;
         opt.dataset.v = l.voice;
         sel.appendChild(opt);
     });
-
-    sel.selectedIndex = 0;
 }
 
 
 /* =========================
-   timeout fetch（手機必備）
+   speech
 ========================= */
-function safeFetch(url, opt, t=8000) {
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+
+let mode = "me";
+
+function runMic(m) {
+    mode = m;
+
+    const sel = document.getElementById("target");
+
+    recognition.lang = m === "me"
+        ? "zh-TW"
+        : sel.selectedOptions[0].dataset.v;
+
+    try { recognition.start(); }
+    catch(e){ recognition.stop(); }
+}
+
+
+/* =========================
+   timeout fetch
+========================= */
+async function safeFetch(url, opt, t=8000){
     return Promise.race([
-        fetch(url, opt),
-        new Promise((_, r)=>setTimeout(()=>r("timeout"), t))
+        fetch(url,opt),
+        new Promise((_,r)=>setTimeout(()=>r("timeout"),t))
     ]);
 }
 
 
 /* =========================
-   語音辨識
+   result
 ========================= */
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-
-function runMic(mode) {
-    currentMode = mode;
-
-    const sel = document.getElementById("target");
-
-    recognition.lang = mode === "me"
-        ? "zh-TW"
-        : sel.selectedOptions[0].dataset.v;
-
-    try {
-        recognition.start();
-    } catch(e) {
-        recognition.stop();
-    }
-}
-
-
-/* =========================
-   結果
-========================= */
-recognition.onresult = async (e) => {
+recognition.onresult = async (e)=>{
     const text = e.results[0][0].transcript;
 
     document.getElementById("original").innerText = text;
 
     const sel = document.getElementById("target");
 
-    try {
-        const res = await safeFetch("/", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({
-                text,
-                target: sel.value,
-                mode: currentMode
-            })
-        });
+    const res = await safeFetch("/", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            text,
+            target: sel.value,
+            mode
+        })
+    });
 
-        const data = await res.json();
+    const data = await res.json();
 
-        document.getElementById("translated").innerText = data.translatedText;
+    document.getElementById("translated").innerText = data.translatedText;
 
-        setTimeout(() => {
-            speak(data.translatedText, sel.selectedOptions[0].dataset.v);
-        }, 100);
-
-    } catch(e) {
-        document.getElementById("translated").innerText = "伺服器忙";
-    }
+    speak(data.translatedText, sel.selectedOptions[0].dataset.v);
 };
 
 
 /* =========================
-   TTS（穩定播放）
+   TTS
 ========================= */
-async function speak(text, lang) {
-    try {
-        const res = await fetch("/tts", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({
-                text,
-                lang: lang.split("-")[0]
-            })
-        });
+async function speak(text, lang){
+    const res = await fetch("/tts",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            text,
+            lang: lang.split("-")[0]
+        })
+    });
 
-        const data = await res.json();
+    const data = await res.json();
 
-        const audio = new Audio(data.audio_url);
+    const audio = new Audio(data.audio_url);
 
-        setTimeout(() => {
-            audio.play().catch(()=>{});
-        }, 120);
-
-    } catch(e) {
-        console.log(e);
-    }
+    setTimeout(()=>{
+        audio.play().catch(()=>{});
+    },100);
 }
 
 </script>
-
-</body>
-</html>
 
 </body>
 </html>
