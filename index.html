@@ -32,28 +32,21 @@ h2 { color:#1a73e8; }
     margin-bottom:10px;
 }
 
+/* 選單 */
 .select-container {
-    display:flex;
-    gap:10px;
     margin-bottom:15px;
 }
 
 select {
-    flex:1;
-    padding:12px;
-    border-radius:12px;
-    border:1px solid #ddd;
-    font-size:1rem;
+    width:100%;
+    padding:14px;
+    border-radius:15px;
+    border:2px solid #eee;
+    font-size:1.1rem;
+    outline:none;
 }
 
-.add-btn {
-    width:55px;
-    border:none;
-    border-radius:12px;
-    background:#e8f0fe;
-    font-size:1.5rem;
-}
-
+/* 按鈕 */
 .btn-group {
     display:flex;
     gap:10px;
@@ -64,7 +57,7 @@ select {
     flex:1;
     height:110px;
     border:none;
-    border-radius:20px;
+    border-radius:25px;
     color:white;
     font-size:1.1rem;
     display:flex;
@@ -80,6 +73,7 @@ select {
     background:#ea4335 !important;
 }
 
+/* 結果 */
 #result-box {
     background:#f8f9fa;
     border-radius:20px;
@@ -87,33 +81,17 @@ select {
     text-align:left;
 }
 
-#original { color:#888; margin-bottom:8px; }
-#translated { font-size:1.5rem; font-weight:bold; }
-
-#modal {
-    display:none;
-    position:fixed;
-    top:0; left:0;
-    width:100%; height:100%;
-    background:rgba(0,0,0,0.6);
+#original {
+    color:#888;
+    margin-bottom:8px;
+    border-bottom:1px dotted #ccc;
+    padding-bottom:5px;
 }
 
-.modal-body {
-    background:white;
-    width:85%;
-    margin:10% auto;
-    padding:20px;
-    border-radius:20px;
-    max-height:70vh;
-    overflow-y:auto;
+#translated {
+    font-size:1.5rem;
+    font-weight:bold;
 }
-
-.lang-item {
-    padding:12px;
-    border-bottom:1px solid #eee;
-    cursor:pointer;
-}
-.lang-item:hover { background:#f0f2f5; }
 </style>
 </head>
 
@@ -125,7 +103,6 @@ select {
 
 <div class="select-container">
 <select id="target" onchange="updateLabel()"></select>
-<button class="add-btn" onclick="toggleModal(true)">＋</button>
 </div>
 
 <div class="btn-group">
@@ -144,22 +121,10 @@ select {
 </div>
 </div>
 
-<!-- Modal -->
-<div id="modal" onclick="toggleModal(false)">
-<div class="modal-body" onclick="event.stopPropagation()">
-
-<input id="search" placeholder="搜尋語言..." style="width:100%;padding:10px;margin-bottom:10px;border-radius:10px;border:1px solid #ddd;">
-
-<div id="lang-list"></div>
-
-<button onclick="toggleModal(false)" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:10px;background:#eee;">關閉</button>
-
-</div>
-</div>
-
 <script>
 let LANGS = [];
 
+// ===== 載入語言 + 分組 =====
 async function loadLanguages() {
     const res = await fetch("/languages");
     LANGS = await res.json();
@@ -167,56 +132,42 @@ async function loadLanguages() {
     const sel = document.getElementById("target");
     sel.innerHTML = "";
 
+    const groups = {};
+
     LANGS.forEach(l => {
-        const opt = document.createElement("option");
-        opt.value = l.name;
-        opt.textContent = l.name + " " + l.label;
-        opt.dataset.v = l.voice;
-        sel.appendChild(opt);
+        if (!groups[l.group]) groups[l.group] = [];
+        groups[l.group].push(l);
     });
 
+    for (let g in groups) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = g;
+
+        groups[g].forEach(l => {
+            const opt = document.createElement("option");
+            opt.value = l.name;
+            opt.textContent = l.name + " " + l.label;
+            opt.dataset.v = l.voice;
+            optgroup.appendChild(opt);
+        });
+
+        sel.appendChild(optgroup);
+    }
+
     const saved = localStorage.getItem("lang");
-    if(saved) sel.value = saved;
+    if (saved) sel.value = saved;
 
     updateLabel();
-    renderLangList();
 }
 
+// ===== 更新顯示 =====
 function updateLabel() {
-    const val = document.getElementById('target').value;
-    document.getElementById('target-name').innerText = val;
+    const val = document.getElementById("target").value;
+    document.getElementById("target-name").innerText = val;
     localStorage.setItem("lang", val);
 }
 
-function toggleModal(show) {
-    document.getElementById("modal").style.display = show ? "block" : "none";
-}
-
-function renderLangList(filter="") {
-    const list = document.getElementById("lang-list");
-    list.innerHTML = "";
-
-    LANGS
-    .filter(l => l.name.includes(filter) || l.label.toLowerCase().includes(filter))
-    .forEach(l => {
-        const div = document.createElement("div");
-        div.className = "lang-item";
-        div.innerText = l.label + " " + l.name;
-        div.onclick = () => selectLang(l.name);
-        list.appendChild(div);
-    });
-}
-
-document.getElementById("search").oninput = e => {
-    renderLangList(e.target.value);
-};
-
-function selectLang(name) {
-    document.getElementById("target").value = name;
-    updateLabel();
-    toggleModal(false);
-}
-
+// ===== 語音辨識 =====
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
 function runMic(mode) {
@@ -254,7 +205,7 @@ recognition.onresult = async (e) => {
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({
                 text,
-                target:sel.value,
+                target: sel.value,
                 mode: (recognition.lang === "zh-TW") ? "me" : "other"
             })
         });
@@ -262,9 +213,7 @@ recognition.onresult = async (e) => {
         const data = await res.json();
         document.getElementById("translated").innerText = data.translatedText;
 
-        speak(data.translatedText,
-            sel.selectedOptions[0].dataset.v
-        );
+        speak(data.translatedText, sel.selectedOptions[0].dataset.v);
 
         document.getElementById("status").innerText = "完成";
     } catch(err) {
@@ -272,6 +221,7 @@ recognition.onresult = async (e) => {
     }
 };
 
+// ===== 語音播放 =====
 function speak(text, lang) {
     window.speechSynthesis.cancel();
 
@@ -282,6 +232,7 @@ function speak(text, lang) {
     speechSynthesis.speak(msg);
 }
 
+// ===== 啟動 =====
 loadLanguages();
 </script>
 
