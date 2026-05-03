@@ -44,46 +44,43 @@ def home():
             "菲律賓文": "tl"
         }
 
-        target_lang_code = codes.get(target_name, "en")
+        target = codes.get(target_name, "en")
 
         if mode == "other":
-            source_lang = target_lang_code
+            source = target
             target_lang = "zh-TW"
         else:
-            source_lang = "zh-TW"
-            target_lang = target_lang_code
+            source = "zh-TW"
+            target_lang = target
 
-        translated = GoogleTranslator(
-            source=source_lang,
-            target=target_lang
-        ).translate(text)
+        result = GoogleTranslator(source=source, target=target_lang).translate(text)
 
-        return jsonify({"translatedText": translated})
+        return jsonify({"translatedText": result})
 
     except Exception as e:
-        print("翻譯錯誤:", e)
-        return jsonify({"translatedText": "翻譯錯誤"}), 500
+        print("error:", e)
+        return jsonify({"translatedText": "錯誤"}), 500
 
 
 # =========================
-# 🔥 languages（iPhone 白畫面關鍵修復）
+# languages API
 # =========================
 @app.route("/languages")
 def languages():
     return jsonify([
-        {"group":"亞洲","name":"英文","voice":"en-US","label":"English 🇺🇸"},
-        {"group":"亞洲","name":"日文","voice":"ja-JP","label":"日本語 🇯🇵"},
-        {"group":"亞洲","name":"韓文","voice":"ko-KR","label":"한국어 🇰🇷"},
-        {"group":"歐洲","name":"法文","voice":"fr-FR","label":"Français 🇫🇷"},
-        {"group":"歐洲","name":"德文","voice":"de-DE","label":"Deutsch 🇩🇪"},
-        {"group":"歐洲","name":"西班牙文","voice":"es-ES","label":"Español 🇪🇸"},
-        {"group":"亞洲","name":"越南文","voice":"vi-VN","label":"Tiếng Việt 🇻🇳"},
-        {"group":"亞洲","name":"泰文","voice":"th-TH","label":"ไทย 🇹🇭"}
+        {"name":"英文","voice":"en-US"},
+        {"name":"日文","voice":"ja-JP"},
+        {"name":"韓文","voice":"ko-KR"},
+        {"name":"法文","voice":"fr-FR"},
+        {"name":"德文","voice":"de-DE"},
+        {"name":"西班牙文","voice":"es-ES"},
+        {"name":"越南文","voice":"vi-VN"},
+        {"name":"泰文","voice":"th-TH"}
     ])
 
 
 # =========================
-# TTS（穩定）
+# TTS
 # =========================
 @app.route("/tts", methods=["POST"])
 def tts():
@@ -91,9 +88,6 @@ def tts():
         data = request.get_json()
         text = data.get("text", "")
         lang = data.get("lang", "en")
-
-        if not text:
-            return jsonify({"error": "no text"}), 400
 
         filename = f"{uuid.uuid4().hex}.mp3"
         path = os.path.join("/tmp", filename)
@@ -103,8 +97,8 @@ def tts():
         return jsonify({"audio_url": f"/audio/{filename}"})
 
     except Exception as e:
-        print("TTS error:", e)
-        return jsonify({"error": "tts failed"}), 500
+        print(e)
+        return jsonify({"error":"tts"}), 500
 
 
 @app.route("/audio/<file>")
@@ -113,8 +107,20 @@ def audio(file):
 
 
 # =========================
-# Render 啟動
+# PWA manifest
 # =========================
+@app.route("/manifest.json")
+def manifest():
+    return jsonify({
+        "name": "翻譯官",
+        "short_name": "翻譯",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#1a73e8"
+    })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
