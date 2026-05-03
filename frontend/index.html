@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>進階語音翻譯</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{font-family:-apple-system;background:#f2f4f7;text-align:center;margin:0;padding:15px}
+.card{max-width:450px;margin:auto;background:#fff;padding:20px;border-radius:20px}
+select{width:100%;padding:12px}
+button{width:48%;padding:20px;border:none;border-radius:15px;color:#fff}
+#me{background:#1a73e8}
+#other{background:#34a853}
+#out{margin-top:20px;background:#eee;padding:15px;border-radius:10px;text-align:left}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h2>進階語音翻譯</h2>
+
+<select id="lang"></select>
+
+<div>
+<button id="me" onclick="start('me')">我講</button>
+<button id="other" onclick="start('other')">對方講</button>
+</div>
+
+<div id="out">
+<div id="ori">...</div>
+<div id="tran"></div>
+</div>
+</div>
+
+<script>
+const API = "https://ai-v60j.onrender.com";
+
+let rec = new (window.SpeechRecognition||window.webkitSpeechRecognition)();
+
+async function loadLang(){
+    const res = await fetch(API+"/languages");
+    const data = await res.json();
+
+    const sel = document.getElementById("lang");
+
+    data.forEach(l=>{
+        let op=document.createElement("option");
+        op.value=l.name;
+        op.textContent=l.name;
+        op.dataset.v=l.code;
+        sel.appendChild(op);
+    });
+}
+loadLang();
+
+function start(mode){
+    const sel=document.getElementById("lang");
+
+    rec.lang = mode==="me"?"zh-TW":sel.selectedOptions[0].dataset.v;
+
+    rec.start();
+}
+
+rec.onresult = e=>{
+    const text = e.results[0][0].transcript;
+
+    document.getElementById("ori").innerText=text;
+
+    const sel=document.getElementById("lang");
+
+    fetch(API+"/translate",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            text,
+            target:sel.value,
+            mode:"me"
+        })
+    })
+    .then(r=>r.json())
+    .then(d=>{
+        document.getElementById("tran").innerText=d.text;
+        speak(d.text, sel.selectedOptions[0].dataset.v);
+    });
+};
+
+/* 🔥 TTS */
+function speak(text,lang){
+    fetch(API+"/tts",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({text,lang})
+    })
+    .then(r=>r.json())
+    .then(d=>{
+        new Audio(API+d.url).play();
+    });
+}
+</script>
+
+</body>
+</html>
