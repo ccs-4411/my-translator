@@ -91,6 +91,7 @@ select {
 
 <div class="card">
 <h2>語音翻譯官</h2>
+
 <div id="status">準備就緒</div>
 
 <select id="target"></select>
@@ -116,7 +117,7 @@ let LANGS = [];
 let voices = [];
 
 /* =========================
-   🔥 iPhone 解鎖音訊
+   iPhone 解鎖音訊
 ========================= */
 function unlockAudio() {
     const u = new SpeechSynthesisUtterance(" ");
@@ -125,6 +126,24 @@ function unlockAudio() {
     speechSynthesis.cancel();
 }
 document.addEventListener("click", unlockAudio, { once: true });
+
+/* =========================
+   voices 載入
+========================= */
+speechSynthesis.onvoiceschanged = () => {
+    voices = speechSynthesis.getVoices();
+};
+
+/* =========================
+   同步 UI（重點）
+========================= */
+function syncLang() {
+    const sel = document.getElementById("target");
+
+    document.getElementById("target-name").innerText = sel.value;
+
+    localStorage.setItem("targetLang", sel.value);
+}
 
 /* =========================
    載入語言
@@ -164,18 +183,13 @@ async function loadLanguages() {
         sel.value = savedLang;
     }
 
-    updateLabel();
+    syncLang();
 }
 
 /* =========================
-   UI 更新
+   監聽語言變更（關鍵）
 ========================= */
-function updateLabel() {
-    const sel = document.getElementById("target");
-    document.getElementById("target-name").innerText = sel.value;
-
-    localStorage.setItem("targetLang", sel.value);
-}
+document.getElementById("target").addEventListener("change", syncLang);
 
 /* =========================
    語音辨識
@@ -233,13 +247,12 @@ recognition.onresult = (e) => {
     .then(res => res.json())
     .then(data => {
         document.getElementById("translated").innerText = data.translatedText;
-
         speak(data.translatedText, sel.selectedOptions[0].dataset.v);
     });
 };
 
 /* =========================
-   🔥 穩定語音播放（已修）
+   穩定語音播放
 ========================= */
 function speak(text, lang) {
     speechSynthesis.cancel();
@@ -248,23 +261,13 @@ function speak(text, lang) {
         const msg = new SpeechSynthesisUtterance(text);
 
         const voice = voices.find(v => v.lang === lang);
-        if (voice) {
-            msg.voice = voice;
-        } else {
-            msg.lang = lang;
-        }
+        if (voice) msg.voice = voice;
+        else msg.lang = lang;
 
         msg.rate = 1;
         speechSynthesis.speak(msg);
     }, 120);
 }
-
-/* =========================
-   voices 載入
-========================= */
-speechSynthesis.onvoiceschanged = () => {
-    voices = speechSynthesis.getVoices();
-};
 
 loadLanguages();
 </script>
