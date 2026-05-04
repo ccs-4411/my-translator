@@ -13,12 +13,12 @@
         .card { max-width:450px; margin:auto; background:white; padding:25px; border-radius:30px; box-shadow:0 10px 30px rgba(0,0,0,0.1); }
         h2 { color:#1a73e8; margin-top:0; font-size: 1.6rem; }
         #status { font-size:0.9rem; color:#1a73e8; margin-bottom:12px; font-weight: bold; height: 1.2em; }
-        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; background:white; -webkit-appearance: none; }
+        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; background:white; -webkit-appearance: none; outline: none; }
         .btn-group { display:flex; gap:12px; margin:20px 0; }
-        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; transition: opacity 0.2s; }
+        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; transition: all 0.2s; }
         #btn-me { background:#1a73e8; }
         #btn-other { background:#34a853; }
-        .active { background:#ea4335 !important; transform: scale(0.96); }
+        .active { background:#ea4335 !important; transform: scale(0.96); box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); }
         #result-box { background:#f8f9fa; border-radius:20px; padding:18px; text-align:left; min-height: 120px; border: 1px solid #eee; }
         #original { color:#888; border-bottom:1px solid #eee; padding-bottom:8px; font-size:0.95rem; }
         #translated { font-size:1.5rem; font-weight:bold; margin-top:12px; color:#111; line-height: 1.4; }
@@ -27,7 +27,7 @@
 <body>
 
 <div class="card">
-    <h2>語音翻譯官</h2>
+    <h2 onclick="testSpeech()">語音翻譯官</h2>
     <div id="status">準備就緒</div>
     <select id="target"></select>
     <div class="btn-group">
@@ -42,25 +42,42 @@
 
 <script>
 let voices = [];
-const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
-recognition.continuous = false;
-recognition.interimResults = false;
+let recognition = null;
 
-// 1. 強力解鎖：在主畫面模式下必須由使用者手動點擊觸發音訊通道
-function forceUnlock() {
-    window.speechSynthesis.cancel();
-    const silent = new SpeechSynthesisUtterance(" ");
-    silent.volume = 0;
-    window.speechSynthesis.speak(silent);
+// 初始化語音辨識
+function initRecognition() {
+    const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!Speech) {
+        document.getElementById("status").innerText = "此瀏覽器不支持語音辨識";
+        return;
+    }
+    recognition = new Speech();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = async (e) => {
+        const text = e.results[0][0].transcript;
+        document.getElementById("original").innerText = text;
+        handleTranslation(text);
+    };
+
+    recognition.onerror = (e) => {
+        console.error("辨識錯誤:", e.error);
+        document.getElementById("status").innerText = "❌ 辨識失敗 (" + e.error + ")";
+        resetUI();
+    };
+
+    recognition.onend = () => {
+        resetUI();
+    };
 }
 
-function loadVoices() {
-    voices = window.speechSynthesis.getVoices();
+// 測試語音引擎
+function testSpeech() {
+    speak("測試語音正常", "zh-TW");
 }
-window.speechSynthesis.onvoiceschanged = loadVoices;
-loadVoices();
 
-async function init() {
+async function initLangs() {
     try {
         const res = await fetch("/languages");
         const langs = await res.json();
@@ -85,31 +102,40 @@ function sync() {
 }
 document.getElementById("target").addEventListener("change", sync);
 
+// 解決 aborted 錯誤的核心邏輯
 function runMic(mode) {
-    forceUnlock(); // 關鍵：每次點擊立即佔用音訊通道
+    // 每次觸發都強行解鎖音訊環境
+    window.speechSynthesis.cancel();
+    const silent = new SpeechSynthesisUtterance(" ");
+    silent.volume = 0;
+    window.speechSynthesis.speak(silent);
+
+    if (!recognition) initRecognition();
 
     const sel = document.getElementById("target");
     const isMe = (mode === "me");
     recognition.lang = isMe ? "zh-TW" : sel.selectedOptions[0].dataset.v;
     
+    // UI 反饋
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(isMe ? 'btn-me' : 'btn-other').classList.add('active');
     document.getElementById("status").innerText = "🎤 請說話...";
 
-    // 解決 PWA 麥克風啟動可能失敗的問題
-    try { recognition.stop(); } catch(e) {}
+    // 先中止任何進行中的辨識，延遲後再啟動
+    try { recognition.abort(); } catch(e) {}
+    
     setTimeout(() => {
         try {
             recognition.start();
         } catch(e) {
-            document.getElementById("status").innerText = "❌ 權限錯誤";
+            console.log("啟動重試...");
+            recognition.stop();
+            setTimeout(() => recognition.start(), 200);
         }
-    }, 250);
+    }, 150);
 }
 
-recognition.onresult = async (e) => {
-    const text = e.results[0][0].transcript;
-    document.getElementById("original").innerText = text;
+async function handleTranslation(text) {
     document.getElementById("status").innerText = "🔄 翻譯中...";
     const sel = document.getElementById("target");
     const isMe = (recognition.lang === "zh-TW");
@@ -127,29 +153,19 @@ recognition.onresult = async (e) => {
         const playLang = isMe ? sel.selectedOptions[0].dataset.v : "zh-TW";
         speak(data.translatedText, playLang);
     } catch (err) {
-        document.getElementById("status").innerText = "❌ 翻譯出錯";
+        document.getElementById("status").innerText = "❌ 翻譯失敗";
     }
-};
+}
 
-recognition.onerror = (e) => {
-    document.getElementById("status").innerText = "❌ 辨識失敗 (" + e.error + ")";
-};
-
-recognition.onend = () => {
+function resetUI() {
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
-};
+}
 
 function speak(text, lang) {
     window.speechSynthesis.cancel();
     
-    // 遞迴確保取得語音引擎清單
     const doSpeak = () => {
         const currentVoices = window.speechSynthesis.getVoices();
-        if (currentVoices.length === 0) {
-            setTimeout(doSpeak, 100);
-            return;
-        }
-
         const msg = new SpeechSynthesisUtterance(text);
         const voice = currentVoices.find(v => v.lang.replace('_','-') === lang) || 
                       currentVoices.find(v => v.lang.startsWith(lang.split('-')[0]));
@@ -159,16 +175,21 @@ function speak(text, lang) {
         msg.volume = 1.0;
         msg.rate = 1.0;
         
-        // 額外延遲 100ms 避開 PWA 的背景凍結
+        // PWA 模式下需要稍作延遲以避開系統攔截
         setTimeout(() => {
             window.speechSynthesis.speak(msg);
         }, 100);
     };
 
-    doSpeak();
+    if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = doSpeak;
+    } else {
+        doSpeak();
+    }
 }
 
-init();
+initLangs();
+initRecognition();
 </script>
 </body>
 </html>
