@@ -4,7 +4,6 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 
-# 設定 static 檔案夾
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
@@ -24,8 +23,6 @@ def get_lang_code(name):
         if lang["name"] == name:
             return lang["code"]
     return "en"
-
-# ===== 路由區 =====
 
 @app.route("/")
 def index():
@@ -51,24 +48,15 @@ def translate():
             return jsonify({"translatedText": ""})
 
         target_code = get_lang_code(target_name)
-
-        if mode == "other":
-            source, target = target_code, "zh-TW"
-        else:
-            source, target = "zh-TW", target_code
+        source, target = (target_code, "zh-TW") if mode == "other" else ("zh-TW", target_code)
 
         result = GoogleTranslator(source=source, target=target).translate(text)
         return jsonify({"translatedText": result})
     except Exception as e:
-        print("翻譯失敗:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
-# 修正後的最後幾行
-if __name__ == "__main__":
-    # 在 Render 部署時，port 會由環境變數決定，預設通常用 10000
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
