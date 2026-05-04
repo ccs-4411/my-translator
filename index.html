@@ -11,14 +11,14 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; -webkit-tap-highlight-color: transparent; }
         .card { max-width:450px; margin:auto; background:white; padding:25px; border-radius:30px; box-shadow:0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color:#1a73e8; margin-top:0; font-size: 1.6rem; }
+        h2 { color:#1a73e8; margin-top:0; font-size: 1.6rem; cursor: pointer; }
         #status { font-size:0.9rem; color:#1a73e8; margin-bottom:12px; font-weight: bold; height: 1.2em; }
         select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; background:white; -webkit-appearance: none; outline: none; }
         .btn-group { display:flex; gap:12px; margin:20px 0; }
-        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; transition: all 0.2s; }
+        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; transition: all 0.2s; -webkit-user-select: none; }
         #btn-me { background:#1a73e8; }
         #btn-other { background:#34a853; }
-        .active { background:#ea4335 !important; transform: scale(0.96); box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); }
+        .active { background:#ea4335 !important; transform: scale(0.96); opacity: 0.8; }
         #result-box { background:#f8f9fa; border-radius:20px; padding:18px; text-align:left; min-height: 120px; border: 1px solid #eee; }
         #original { color:#888; border-bottom:1px solid #eee; padding-bottom:8px; font-size:0.95rem; }
         #translated { font-size:1.5rem; font-weight:bold; margin-top:12px; color:#111; line-height: 1.4; }
@@ -41,21 +41,20 @@
 </div>
 
 <script>
-let voices = [];
 let recognition = null;
+let isProcessing = false;
 
-// 初始化語音辨識
 function initRecognition() {
     const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!Speech) {
-        document.getElementById("status").innerText = "此瀏覽器不支持語音辨識";
+        document.getElementById("status").innerText = "瀏覽器不支持辨識";
         return;
     }
     recognition = new Speech();
     recognition.continuous = false;
     recognition.interimResults = false;
 
-    recognition.onresult = async (e) => {
+    recognition.onresult = (e) => {
         const text = e.results[0][0].transcript;
         document.getElementById("original").innerText = text;
         handleTranslation(text);
@@ -63,7 +62,11 @@ function initRecognition() {
 
     recognition.onerror = (e) => {
         console.error("辨識錯誤:", e.error);
-        document.getElementById("status").innerText = "❌ 辨識失敗 (" + e.error + ")";
+        if (e.error === 'aborted') {
+            document.getElementById("status").innerText = "⚠️ 系統繁忙，請再點一次";
+        } else {
+            document.getElementById("status").innerText = "❌ 失敗: " + e.error;
+        }
         resetUI();
     };
 
@@ -72,7 +75,6 @@ function initRecognition() {
     };
 }
 
-// 測試語音引擎
 function testSpeech() {
     speak("測試語音正常", "zh-TW");
 }
@@ -102,14 +104,12 @@ function sync() {
 }
 document.getElementById("target").addEventListener("change", sync);
 
-// 解決 aborted 錯誤的核心邏輯
 function runMic(mode) {
-    // 每次觸發都強行解鎖音訊環境
+    if (isProcessing) return;
+    
+    // 1. 強制清空所有語音任務，避免語音佔用音訊通道導致麥克風 aborted
     window.speechSynthesis.cancel();
-    const silent = new SpeechSynthesisUtterance(" ");
-    silent.volume = 0;
-    window.speechSynthesis.speak(silent);
-
+    
     if (!recognition) initRecognition();
 
     const sel = document.getElementById("target");
@@ -119,23 +119,24 @@ function runMic(mode) {
     // UI 反饋
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(isMe ? 'btn-me' : 'btn-other').classList.add('active');
-    document.getElementById("status").innerText = "🎤 請說話...";
+    document.getElementById("status").innerText = "🎤 準備中...";
 
-    // 先中止任何進行中的辨識，延遲後再啟動
+    // 2. 核心修正：先 abort 再延遲啟動
     try { recognition.abort(); } catch(e) {}
     
     setTimeout(() => {
         try {
             recognition.start();
+            document.getElementById("status").innerText = "🎤 正在聆聽...";
         } catch(e) {
-            console.log("啟動重試...");
             recognition.stop();
-            setTimeout(() => recognition.start(), 200);
+            setTimeout(() => recognition.start(), 300);
         }
-    }, 150);
+    }, 350); // 給予系統足夠時間切換音訊模式
 }
 
 async function handleTranslation(text) {
+    isProcessing = true;
     document.getElementById("status").innerText = "🔄 翻譯中...";
     const sel = document.getElementById("target");
     const isMe = (recognition.lang === "zh-TW");
@@ -154,6 +155,8 @@ async function handleTranslation(text) {
         speak(data.translatedText, playLang);
     } catch (err) {
         document.getElementById("status").innerText = "❌ 翻譯失敗";
+    } finally {
+        isProcessing = false;
     }
 }
 
@@ -162,30 +165,23 @@ function resetUI() {
 }
 
 function speak(text, lang) {
+    // 播放前確保完全取消之前的播放
     window.speechSynthesis.cancel();
     
-    const doSpeak = () => {
-        const currentVoices = window.speechSynthesis.getVoices();
-        const msg = new SpeechSynthesisUtterance(text);
-        const voice = currentVoices.find(v => v.lang.replace('_','-') === lang) || 
-                      currentVoices.find(v => v.lang.startsWith(lang.split('-')[0]));
-        
-        if (voice) msg.voice = voice;
-        msg.lang = lang;
-        msg.volume = 1.0;
-        msg.rate = 1.0;
-        
-        // PWA 模式下需要稍作延遲以避開系統攔截
-        setTimeout(() => {
-            window.speechSynthesis.speak(msg);
-        }, 100);
-    };
-
-    if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = doSpeak;
-    } else {
-        doSpeak();
-    }
+    const msg = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find(v => v.lang.replace('_','-') === lang) || 
+                  voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+    
+    if (voice) msg.voice = voice;
+    msg.lang = lang;
+    msg.volume = 1.0;
+    msg.rate = 1.0;
+    
+    // iOS PWA 必須在微延遲後播放，避開當前的事件循環
+    setTimeout(() => {
+        window.speechSynthesis.speak(msg);
+    }, 150);
 }
 
 initLangs();
