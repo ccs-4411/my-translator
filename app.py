@@ -11,10 +11,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def load_languages():
     lang_path = os.path.join(BASE_DIR, "languages.json")
-    if not os.path.exists(lang_path):
-        return []
-    with open(lang_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if os.path.exists(lang_path):
+        with open(lang_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
 
 LANGUAGES = load_languages()
 
@@ -48,7 +48,6 @@ def translate():
             return jsonify({"translatedText": ""})
 
         target_code = get_lang_code(target_name)
-        # me: 中 -> 外, other: 外 -> 中
         source, target = ("zh-TW", target_code) if mode == "me" else (target_code, "zh-TW")
 
         result = GoogleTranslator(source=source, target=target).translate(text)
