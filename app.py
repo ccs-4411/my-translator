@@ -64,5 +64,4 @@ def translate():
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
 if __name__ == "__main__":
-    # PWA 測試建議使用 host="0.0.0.0"
-    app.run(host="0.0.0.0", port=5000, debug=True)host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
