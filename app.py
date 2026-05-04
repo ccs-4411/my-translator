@@ -64,4 +64,4 @@ def translate():
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=10000) # Render 預設通常是 10000 或由系統指定
