@@ -8,12 +8,12 @@ app = Flask(__name__, static_folder='static')
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LANG_FILE = "languages.json"
 
 def load_languages():
-    if not os.path.exists(LANG_FILE):
+    lang_path = os.path.join(BASE_DIR, "languages.json")
+    if not os.path.exists(lang_path):
         return []
-    with open(LANG_FILE, "r", encoding="utf-8") as f:
+    with open(lang_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 LANGUAGES = load_languages()
@@ -48,7 +48,8 @@ def translate():
             return jsonify({"translatedText": ""})
 
         target_code = get_lang_code(target_name)
-        source, target = (target_code, "zh-TW") if mode == "other" else ("zh-TW", target_code)
+        # me: 中 -> 外, other: 外 -> 中
+        source, target = ("zh-TW", target_code) if mode == "me" else (target_code, "zh-TW")
 
         result = GoogleTranslator(source=source, target=target).translate(text)
         return jsonify({"translatedText": result})
@@ -57,6 +58,4 @@ def translate():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
