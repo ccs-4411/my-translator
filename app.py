@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 
-# 這裡設定 static_folder='static' 讓 Flask 知道去哪找圖示
+# 設定 static 檔案夾
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
@@ -52,8 +52,6 @@ def translate():
 
         target_code = get_lang_code(target_name)
 
-        # me: 我講中文(zh-TW) -> 翻成外語(target_code)
-        # other: 對方講外語(target_code) -> 翻成中文(zh-TW)
         if mode == "other":
             source, target = target_code, "zh-TW"
         else:
@@ -64,6 +62,10 @@ def translate():
     except Exception as e:
         print("翻譯失敗:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 # 修正後的最後幾行
 if __name__ == "__main__":
