@@ -3,22 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- PWA & iOS 支援 -->
     <title>語音翻譯官</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="語音翻譯">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+
     <style>
-        body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; }
+        body { font-family: -apple-system, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; }
         .card { max-width:450px; margin:auto; background:white; padding:25px; border-radius:30px; box-shadow:0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color:#1a73e8; }
-        #status { font-size:0.85rem; color:#888; margin-bottom:10px; }
-        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; }
+        h2 { color:#1a73e8; margin-top:0; }
+        #status { font-size:0.85rem; color:#888; margin-bottom:10px; height: 1.2em; }
+        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; appearance: none; background: white; }
         .btn-group { display:flex; gap:10px; margin:20px 0; }
-        .mic-btn { flex:1; height:110px; border:none; border-radius:25px; color:white; font-size:1.1rem; display:flex; flex-direction:column; justify-content:center; align-items:center; cursor:pointer; }
+        .mic-btn { flex:1; height:110px; border:none; border-radius:25px; color:white; font-size:1.1rem; cursor:pointer; transition: 0.3s; }
         #btn-me { background:#1a73e8; }
         #btn-other { background:#34a853; }
-        .mic-btn.active { background:#ea4335 !important; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        #result-box { background:#f8f9fa; border-radius:20px; padding:15px; text-align:left; min-height: 80px; }
-        #original { color:#888; margin-bottom:8px; border-bottom:1px dotted #ccc; padding-bottom:5px; font-size: 0.9rem; }
-        #translated { font-size:1.5rem; font-weight:bold; color: #333; }
+        .active { background:#ea4335 !important; transform: scale(0.95); opacity: 0.8; }
+        #result-box { background:#f8f9fa; border-radius:20px; padding:15px; text-align:left; min-height: 100px; }
+        #original { color:#888; border-bottom:1px dotted #ccc; padding-bottom:5px; font-size:0.9rem; }
+        #translated { font-size:1.4rem; font-weight:bold; margin-top:10px; color:#333; }
     </style>
 </head>
 <body>
@@ -34,7 +41,7 @@
     </div>
 
     <div id="result-box">
-        <div id="original">等待語音輸入...</div>
+        <div id="original">等待說話...</div>
         <div id="translated">翻譯結果</div>
     </div>
 </div>
@@ -43,72 +50,68 @@
 let voices = [];
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 recognition.continuous = false;
-recognition.interimResults = false;
 
-// 解鎖語音 (iOS/Android 必備)
+// 1. 解鎖語音 (iOS PWA 關鍵)
 function unlockAudio() {
     const u = new SpeechSynthesisUtterance("");
-    speechSynthesis.speak(u);
+    window.speechSynthesis.speak(u);
 }
-document.addEventListener("touchstart", unlockAudio, { once: true });
 document.addEventListener("click", unlockAudio, { once: true });
 
-// 載入語音清單
+// 2. 載入語音人
 function loadVoices() {
-    voices = speechSynthesis.getVoices();
+    voices = window.speechSynthesis.getVoices();
 }
-speechSynthesis.onvoiceschanged = loadVoices;
+window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
 
-// 載入語言選單
-async function loadLanguages() {
-    const res = await fetch("/languages");
-    const langs = await res.json();
-    const sel = document.getElementById("target");
-    
-    const groups = {};
-    langs.forEach(l => {
-        if (!groups[l.group]) groups[l.group] = [];
-        groups[l.group].push(l);
-    });
-
-    for (let g in groups) {
-        const optgroup = document.createElement("optgroup");
-        optgroup.label = g;
-        groups[g].forEach(l => {
+// 3. 語言選單
+async function init() {
+    try {
+        const res = await fetch("/languages");
+        const langs = await res.json();
+        const sel = document.getElementById("target");
+        
+        langs.forEach(l => {
             const opt = document.createElement("option");
             opt.value = l.name;
             opt.textContent = `${l.name} ${l.label}`;
-            opt.dataset.v = l.voice; // 語音辨識與播放代碼
-            optgroup.appendChild(opt);
+            opt.dataset.v = l.voice;
+            sel.appendChild(opt);
         });
-        sel.appendChild(optgroup);
-    }
-    
-    const saved = localStorage.getItem("targetLang");
-    if (saved) sel.value = saved;
-    syncLang();
+
+        const saved = localStorage.getItem("targetLang");
+        if (saved) sel.value = saved;
+        sync();
+    } catch(e) { console.error("載入失敗", e); }
 }
 
-function syncLang() {
+function sync() {
     const sel = document.getElementById("target");
     document.getElementById("target-name").innerText = sel.value;
     localStorage.setItem("targetLang", sel.value);
 }
-document.getElementById("target").addEventListener("change", syncLang);
+document.getElementById("target").addEventListener("change", sync);
 
-// 執行辨識
+// 4. 語音辨識
 function runMic(mode) {
     unlockAudio();
     const sel = document.getElementById("target");
+    const isMe = (mode === "me");
     
-    recognition.lang = (mode === "me") ? "zh-TW" : sel.selectedOptions[0].dataset.v;
+    recognition.lang = isMe ? "zh-TW" : sel.selectedOptions[0].dataset.v;
     
+    // UI 反饋
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(mode === 'me' ? 'btn-me' : 'btn-other').classList.add('active');
+    document.getElementById(isMe ? 'btn-me' : 'btn-other').classList.add('active');
     document.getElementById("status").innerText = "🎤 聆聽中...";
-    
-    recognition.start();
+
+    try {
+        recognition.start();
+    } catch(e) {
+        recognition.stop();
+        document.getElementById("status").innerText = "請再點一次";
+    }
 }
 
 recognition.onresult = async (e) => {
@@ -133,13 +136,11 @@ recognition.onresult = async (e) => {
         document.getElementById("translated").innerText = data.translatedText;
         document.getElementById("status").innerText = "✅ 完成";
 
-        // 語音播放邏輯：
-        // 我講中文 -> 播放外語 (dataset.v)
-        // 對方講外語 -> 播放中文 (zh-TW)
-        const voiceLang = isMe ? sel.selectedOptions[0].dataset.v : "zh-TW";
-        speak(data.translatedText, voiceLang);
+        // 決定播放語系
+        const playLang = isMe ? sel.selectedOptions[0].dataset.v : "zh-TW";
+        speak(data.translatedText, playLang);
     } catch (err) {
-        document.getElementById("status").innerText = "❌ 錯誤";
+        document.getElementById("status").innerText = "❌ 翻譯出錯";
     }
 };
 
@@ -147,22 +148,25 @@ recognition.onend = () => {
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
 };
 
+// 5. 語音播放
 function speak(text, lang) {
-    speechSynthesis.cancel(); // 先停止之前的語音
+    window.speechSynthesis.cancel();
+    if (voices.length === 0) voices = window.speechSynthesis.getVoices();
+
     setTimeout(() => {
         const msg = new SpeechSynthesisUtterance(text);
-        
-        // 嘗試匹配最佳語音人
         const voice = voices.find(v => v.lang.replace('_','-') === lang) || 
                       voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-        
         if (voice) msg.voice = voice;
         msg.lang = lang;
-        msg.rate = 1.0;
-        speechSynthesis.speak(msg);
+        window.speechSynthesis.speak(msg);
     }, 100);
 }
 
+init();
+</script>
+</body>
+</html>
 loadLanguages();
 </script>
 </body>
