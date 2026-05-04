@@ -9,16 +9,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <style>
-        body { font-family: -apple-system, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; }
+        body { font-family: -apple-system, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; -webkit-user-select: none; }
         .card { max-width:450px; margin:auto; background:white; padding:25px; border-radius:30px; box-shadow:0 10px 30px rgba(0,0,0,0.1); }
         h2 { color:#1a73e8; margin-top:0; }
         #status { font-size:0.9rem; color:#888; margin-bottom:12px; font-weight: bold; height: 1.2em; }
         select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; background:white; }
         .btn-group { display:flex; gap:12px; margin:20px 0; }
-        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; }
+        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; -webkit-tap-highlight-color: transparent; }
         #btn-me { background:#1a73e8; }
         #btn-other { background:#34a853; }
-        .active { background:#ea4335 !important; transform: scale(0.95); opacity: 0.8; }
+        .active { background:#ea4335 !important; transform: scale(0.95); }
         #result-box { background:#f8f9fa; border-radius:20px; padding:18px; text-align:left; min-height: 120px; border: 1px solid #eee; }
         #original { color:#888; border-bottom:1px solid #eee; padding-bottom:8px; font-size:0.95rem; }
         #translated { font-size:1.5rem; font-weight:bold; margin-top:12px; color:#111; line-height: 1.4; }
@@ -27,7 +27,7 @@
 <body>
 
 <div class="card">
-    <h2>語音翻譯官</h2>
+    <h2 id="app-title">語音翻譯官</h2>
     <div id="status">準備就緒</div>
     <select id="target"></select>
     <div class="btn-group">
@@ -42,10 +42,23 @@
 
 <script>
 let voices = [];
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
 recognition.continuous = false;
 
-// 預加載語音
+// 1. 解決 iOS 語音鎖定的關鍵
+function unlockAudio() {
+    const silent = new SpeechSynthesisUtterance("");
+    silent.volume = 0;
+    window.speechSynthesis.speak(silent);
+}
+
+// 點擊標題也可以手動解鎖音訊
+document.getElementById('app-title').onclick = () => {
+    unlockAudio();
+    const t = new SpeechSynthesisUtterance("測試中");
+    window.speechSynthesis.speak(t);
+};
+
 function loadVoices() {
     voices = window.speechSynthesis.getVoices();
 }
@@ -53,19 +66,21 @@ window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
 
 async function init() {
-    const res = await fetch("/languages");
-    const langs = await res.json();
-    const sel = document.getElementById("target");
-    langs.forEach(l => {
-        const opt = document.createElement("option");
-        opt.value = l.name;
-        opt.textContent = `${l.name} ${l.label}`;
-        opt.dataset.v = l.voice;
-        sel.appendChild(opt);
-    });
-    const saved = localStorage.getItem("targetLang");
-    if (saved) sel.value = saved;
-    sync();
+    try {
+        const res = await fetch("/languages");
+        const langs = await res.json();
+        const sel = document.getElementById("target");
+        langs.forEach(l => {
+            const opt = document.createElement("option");
+            opt.value = l.name;
+            opt.textContent = `${l.name} ${l.label}`;
+            opt.dataset.v = l.voice;
+            sel.appendChild(opt);
+        });
+        const saved = localStorage.getItem("targetLang");
+        if (saved) sel.value = saved;
+        sync();
+    } catch(e) { console.error(e); }
 }
 
 function sync() {
@@ -75,12 +90,9 @@ function sync() {
 }
 document.getElementById("target").addEventListener("change", sync);
 
-// 核心修正：runMic 時先播放無聲語音佔位
 function runMic(mode) {
-    // 【關鍵】立刻播放無聲語音，解鎖 iOS 播放權限
-    const silent = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(silent);
-
+    unlockAudio(); // 每次點擊都嘗試解鎖
+    
     const sel = document.getElementById("target");
     const isMe = (mode === "me");
     recognition.lang = isMe ? "zh-TW" : sel.selectedOptions[0].dataset.v;
@@ -121,24 +133,33 @@ recognition.onend = () => {
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
 };
 
+// 2. 強化版發聲函式
 function speak(text, lang) {
     window.speechSynthesis.cancel();
-    // 再次確認 voices 是否抓到
-    if (voices.length === 0) voices = window.speechSynthesis.getVoices();
     
-    const msg = new SpeechSynthesisUtterance(text);
-    const voice = voices.find(v => v.lang.replace('_','-') === lang) || 
-                  voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-    
-    if (voice) msg.voice = voice;
-    msg.lang = lang;
-    msg.volume = 1.0;
-    msg.rate = 1.0;
+    const doSpeak = () => {
+        const currentVoices = window.speechSynthesis.getVoices();
+        if (currentVoices.length === 0) {
+            setTimeout(doSpeak, 100);
+            return;
+        }
 
-    // 稍微延遲以避開非同步鎖定
-    setTimeout(() => {
-        window.speechSynthesis.speak(msg);
-    }, 100);
+        const msg = new SpeechSynthesisUtterance(text);
+        const voice = currentVoices.find(v => v.lang.replace('_','-') === lang) || 
+                      currentVoices.find(v => v.lang.startsWith(lang.split('-')[0]));
+        
+        if (voice) msg.voice = voice;
+        msg.lang = lang;
+        msg.volume = 1.0;
+        msg.rate = 1.0;
+        
+        // iOS 需要在微小延遲後播放
+        setTimeout(() => {
+            window.speechSynthesis.speak(msg);
+        }, 60);
+    };
+
+    doSpeak();
 }
 
 init();
