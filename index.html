@@ -3,29 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- PWA & iOS 支援 -->
     <title>語音翻譯官</title>
+    
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="語音翻譯">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
 
     <style>
-        body { font-family: -apple-system, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; }
+        body { font-family: -apple-system, sans-serif; background:#f2f4f7; margin:0; padding:15px; text-align:center; -webkit-tap-highlight-color: transparent; }
         .card { max-width:450px; margin:auto; background:white; padding:25px; border-radius:30px; box-shadow:0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color:#1a73e8; margin-top:0; }
-        #status { font-size:0.85rem; color:#888; margin-bottom:10px; height: 1.2em; }
-        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; appearance: none; background: white; }
-        .btn-group { display:flex; gap:10px; margin:20px 0; }
-        .mic-btn { flex:1; height:110px; border:none; border-radius:25px; color:white; font-size:1.1rem; cursor:pointer; transition: 0.3s; }
-        #btn-me { background:#1a73e8; }
-        #btn-other { background:#34a853; }
-        .active { background:#ea4335 !important; transform: scale(0.95); opacity: 0.8; }
-        #result-box { background:#f8f9fa; border-radius:20px; padding:15px; text-align:left; min-height: 100px; }
-        #original { color:#888; border-bottom:1px dotted #ccc; padding-bottom:5px; font-size:0.9rem; }
-        #translated { font-size:1.4rem; font-weight:bold; margin-top:10px; color:#333; }
+        h2 { color:#1a73e8; margin-top:0; font-size: 1.8rem; }
+        #status { font-size:0.9rem; color:#888; margin-bottom:12px; height: 1.2em; font-weight: bold; }
+        select { width:100%; padding:14px; border-radius:15px; border:2px solid #eee; font-size:1.1rem; margin-bottom:10px; background:white; cursor: pointer; }
+        .btn-group { display:flex; gap:12px; margin:20px 0; }
+        .mic-btn { flex:1; height:120px; border:none; border-radius:25px; color:white; font-size:1.2rem; cursor:pointer; font-weight: bold; transition: all 0.2s; }
+        #btn-me { background:#1a73e8; box-shadow: 0 4px 15px rgba(26,115,232,0.3); }
+        #btn-other { background:#34a853; box-shadow: 0 4px 15px rgba(52,168,83,0.3); }
+        .active { background:#ea4335 !important; transform: scale(0.95); opacity: 0.9; box-shadow: none !important; }
+        #result-box { background:#f8f9fa; border-radius:20px; padding:18px; text-align:left; min-height: 120px; border: 1px solid #eee; }
+        #original { color:#888; border-bottom:1px solid #eee; padding-bottom:8px; font-size:0.95rem; min-height: 1.2em; }
+        #translated { font-size:1.5rem; font-weight:bold; margin-top:12px; color:#111; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -48,30 +46,35 @@
 
 <script>
 let voices = [];
+let audioUnlocked = false;
 const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 recognition.continuous = false;
+recognition.interimResults = false;
 
-// 1. 解鎖語音 (iOS PWA 關鍵)
+// 強制解鎖 iPhone 音訊引擎
 function unlockAudio() {
-    const u = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(u);
+    if (!audioUnlocked) {
+        const u = new SpeechSynthesisUtterance("");
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+        audioUnlocked = true;
+    }
 }
-document.addEventListener("click", unlockAudio, { once: true });
 
-// 2. 載入語音人
+// 點擊畫面任何地方先行解鎖
+document.addEventListener("touchstart", unlockAudio, { once: true });
+
 function loadVoices() {
     voices = window.speechSynthesis.getVoices();
 }
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
 
-// 3. 語言選單
 async function init() {
     try {
         const res = await fetch("/languages");
         const langs = await res.json();
         const sel = document.getElementById("target");
-        
         langs.forEach(l => {
             const opt = document.createElement("option");
             opt.value = l.name;
@@ -79,11 +82,10 @@ async function init() {
             opt.dataset.v = l.voice;
             sel.appendChild(opt);
         });
-
         const saved = localStorage.getItem("targetLang");
         if (saved) sel.value = saved;
         sync();
-    } catch(e) { console.error("載入失敗", e); }
+    } catch(e) { document.getElementById("status").innerText = "載入語言失敗"; }
 }
 
 function sync() {
@@ -93,25 +95,28 @@ function sync() {
 }
 document.getElementById("target").addEventListener("change", sync);
 
-// 4. 語音辨識
 function runMic(mode) {
-    unlockAudio();
+    unlockAudio(); // 每次點按鈕都嘗試解鎖
+    window.speechSynthesis.cancel(); // 停止所有正在發聲的語音
+
     const sel = document.getElementById("target");
     const isMe = (mode === "me");
-    
     recognition.lang = isMe ? "zh-TW" : sel.selectedOptions[0].dataset.v;
     
-    // UI 反饋
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(isMe ? 'btn-me' : 'btn-other').classList.add('active');
     document.getElementById("status").innerText = "🎤 聆聽中...";
 
-    try {
-        recognition.start();
-    } catch(e) {
-        recognition.stop();
-        document.getElementById("status").innerText = "請再點一次";
-    }
+    // iOS 補丁：先 stop 再 start 確保麥克風重啟
+    try { recognition.stop(); } catch(e) {}
+    
+    setTimeout(() => {
+        try {
+            recognition.start();
+        } catch(e) {
+            document.getElementById("status").innerText = "❌ 請重新點擊按鈕";
+        }
+    }, 200);
 }
 
 recognition.onresult = async (e) => {
@@ -126,21 +131,26 @@ recognition.onresult = async (e) => {
         const res = await fetch("/translate", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({
-                text: text,
-                target: sel.value,
-                mode: isMe ? "me" : "other"
-            })
+            body: JSON.stringify({ text, target: sel.value, mode: isMe ? "me" : "other" })
         });
         const data = await res.json();
+        
         document.getElementById("translated").innerText = data.translatedText;
-        document.getElementById("status").innerText = "✅ 完成";
+        document.getElementById("status").innerText = "✅ 翻譯完成";
 
-        // 決定播放語系
         const playLang = isMe ? sel.selectedOptions[0].dataset.v : "zh-TW";
         speak(data.translatedText, playLang);
     } catch (err) {
-        document.getElementById("status").innerText = "❌ 翻譯出錯";
+        document.getElementById("status").innerText = "❌ 翻譯連線失敗";
+    }
+};
+
+recognition.onerror = (event) => {
+    console.error("語音錯誤:", event.error);
+    if (event.error === 'not-allowed') {
+        document.getElementById("status").innerText = "❌ 請在系統設定開啟麥克風權限";
+    } else {
+        document.getElementById("status").innerText = "❌ 沒聽清楚，請再試一次";
     }
 };
 
@@ -148,26 +158,25 @@ recognition.onend = () => {
     document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('active'));
 };
 
-// 5. 語音播放
 function speak(text, lang) {
     window.speechSynthesis.cancel();
-    if (voices.length === 0) voices = window.speechSynthesis.getVoices();
-
+    
+    // 延遲發聲，確保異步回傳後的播放能繞過 iOS 攔截
     setTimeout(() => {
         const msg = new SpeechSynthesisUtterance(text);
+        if (voices.length === 0) voices = window.speechSynthesis.getVoices();
+        
         const voice = voices.find(v => v.lang.replace('_','-') === lang) || 
                       voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+        
         if (voice) msg.voice = voice;
         msg.lang = lang;
+        msg.rate = 1.0;
         window.speechSynthesis.speak(msg);
-    }, 100);
+    }, 150);
 }
 
 init();
-</script>
-</body>
-</html>
-loadLanguages();
 </script>
 </body>
 </html>
