@@ -18,7 +18,7 @@
   {"group":"歐洲","name":"丹麥文","code":"da","voice":"da-DK","label":"Dansk 🇩🇰"},
   {"group":"歐洲","name":"芬蘭文","code":"fi","voice":"fi-FI","label":"Suomi 🇫🇮"},
   {"group":"歐洲","name":"瑞典文","code":"sv","voice":"sv-SE","label":"Svenska 🇸🇪"},
-  {"group":"東南亞","name":"印尼文","code":"id","voice":"id-ID","label":"Bahasa Indonesia 🇮🇩"},
+  {"group":"東南亞","name":"印尼文","code":"id","voice":"in-ID","label":"Bahasa Indonesia 🇮🇩"},
   {"group":"歐洲","name":"葡萄牙文","code":"pt","voice":"pt-PT","label":"Português 🇵🇹"},
   {"group":"中東","name":"土耳其文","code":"tr","voice":"tr-TR","label":"Türkçe 🇹🇷"},
   {"group":"中東","name":"阿拉伯文","code":"ar","voice":"ar-SA","label":"العربية 🇸🇦"}
