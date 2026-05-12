@@ -121,6 +121,22 @@ select {
 #replay-btn{
     background:#ff9800;
 }
+
+/* ⭐ 調試信息 */
+.debug-info {
+    background:#fffacd;
+    border-radius:10px;
+    padding:10px;
+    margin-top:15px;
+    font-size:0.85rem;
+    color:#666;
+    text-align:left;
+    display:none;
+}
+
+.debug-info.show {
+    display:block;
+}
 </style>
 </head>
 
@@ -177,6 +193,9 @@ select {
 
         </div>
 
+        <!-- ⭐ 調試信息 -->
+        <div class="debug-info" id="debug-info"></div>
+
     </div>
 
 </div>
@@ -191,6 +210,54 @@ let audioUnlocked = false;
 /* ⭐ 記錄最後播放 */
 let lastSpeakText = "";
 let lastSpeakLang = "";
+
+/* ⭐ 新增：檢測裝置類型 */
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isAndroid = /Android/.test(navigator.userAgent);
+const isMobile = isIOS || isAndroid;
+
+/* ⭐ 語言識別代碼映射表（針對 Web Speech API） */
+const RECOGNITION_LANG_MAP = {
+    "zh-TW": "zh-TW",
+    "zh-HK": "zh-TW",
+    "en-US": "en-US",
+    "en-GB": "en-GB",
+    "ja-JP": "ja-JP",
+    "ko-KR": "ko-KR",
+    "vi-VN": "vi",        // ⭐ 越南文簡化
+    "th-TH": "th",        // ⭐ 泰文簡化
+    "es-ES": "es-ES",
+    "fr-FR": "fr-FR",
+    "de-DE": "de-DE",
+    "it-IT": "it-IT",
+    "cs-CZ": "cs-CZ",
+    "da-DK": "da-DK",
+    "fi-FI": "fi-FI",
+    "sv-SE": "sv-SE",
+    "id-ID": isIOS ? "en-US" : "id",  // ⭐ iOS 不支持印尼文，使用英文備用
+    "pt-PT": "pt-BR",     // ⭐ 使用巴西葡文（更多手機支持）
+    "pt-BR": "pt-BR",
+    "tr-TR": "tr-TR",
+    "ar-SA": "ar-SA"
+};
+
+/* ⭐ iOS 不支持的語言列表 */
+const IOS_UNSUPPORTED_LANGS = ["id-ID", "vi-VN", "th-TH"];
+
+// ============================
+// ⭐ 調試函數
+// ============================
+function showDebugInfo(msg) {
+    const debugEl = document.getElementById("debug-info");
+    debugEl.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    debugEl.classList.add("show");
+}
+
+function hideDebugInfo() {
+    setTimeout(() => {
+        document.getElementById("debug-info").classList.remove("show");
+    }, 3000);
+}
 
 // ============================
 // ⭐ 1. 載入語音
@@ -260,6 +327,13 @@ async function initLangs() {
                 `${l.name} ${l.label}`;
 
             opt.dataset.v = l.voice;
+            opt.dataset.code = l.code;
+
+            /* ⭐ 新增：標記不支持的語言 */
+            if (isIOS && IOS_UNSUPPORTED_LANGS.includes(l.voice)) {
+                opt.textContent += " ⚠️";
+                opt.dataset.ios_warning = "true";
+            }
 
             sel.appendChild(opt);
 
@@ -331,20 +405,34 @@ function initRecognition() {
     // ⭐ 改良錯誤提示
     recognition.onerror = (e) => {
 
-        console.log(e.error);
+        console.log("語音識別錯誤:", e.error);
+        showDebugInfo(`錯誤代碼: ${e.error} | 語言: ${recognition.lang}`);
 
         if (
             e.error === "service-not-allowed" ||
             e.error === "language-not-supported"
         ) {
 
-            document.getElementById("status").innerText =
-                "⚠️ 此語言可能不支援語音翻譯";
+            const sel = document.getElementById("target");
+            const voice = sel.selectedOptions[0].dataset.v;
+
+            if (isIOS && IOS_UNSUPPORTED_LANGS.includes(voice)) {
+                document.getElementById("status").innerText =
+                    "⚠️ iOS 不支持此語言的語音識別";
+            } else {
+                document.getElementById("status").innerText =
+                    "⚠️ 此語言可能不支援語音翻譯";
+            }
 
         } else if (e.error === "no-speech") {
 
             document.getElementById("status").innerText =
-                "⚠️ 沒有聽到聲音";
+                "⚠️ 沒有聽到聲音，請靠近麥克風";
+
+        } else if (e.error === "network-error") {
+
+            document.getElementById("status").innerText =
+                "⚠��� 網路連接失敗";
 
         } else {
 
@@ -376,10 +464,11 @@ function runMic(mode) {
 
     const isMe = (mode === "me");
 
-    recognition.lang =
-        isMe
-        ? "zh-TW"
-        : sel.selectedOptions[0].dataset.v;
+    /* ⭐ 改良：使用映射表 */
+    let recLang = isMe ? "zh-TW" : sel.selectedOptions[0].dataset.v;
+    recLang = RECOGNITION_LANG_MAP[recLang] || recLang;
+
+    recognition.lang = recLang;
 
     document
         .querySelectorAll('.mic-btn')
@@ -401,13 +490,19 @@ function runMic(mode) {
 
             recognition.start();
 
+            const langDisplay = isMe ? "中文" : sel.value;
             document.getElementById("status")
-                .innerText = "🎤 聆聽中...";
+                .innerText = `🎤 聆聽中... (${langDisplay})`;
+
+            /* ⭐ 調試信息 */
+            showDebugInfo(`開始識別 | 語言: ${recLang} | 裝置: ${isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'}`);
 
         } catch(err) {
 
             document.getElementById("status")
                 .innerText = "⚠️ 無法啟動語音辨識";
+
+            showDebugInfo(`啟動失敗: ${err.message}`);
         }
 
     }, 300);
@@ -482,6 +577,8 @@ async function handleTranslation(text) {
 
         document.getElementById("status")
             .innerText = "翻譯失敗";
+
+        showDebugInfo(`翻譯錯誤: ${err.message}`);
     }
 
     isProcessing = false;
@@ -521,6 +618,10 @@ function speak(text, lang) {
 
     msg.lang = lang;
 
+    msg.rate = 0.9;  // ⭐ 稍微減速便於理解
+    msg.pitch = 1.0;
+    msg.volume = 1.0;
+
     setTimeout(() => {
 
         speechSynthesis.speak(msg);
@@ -553,17 +654,24 @@ function resetUI() {
     document
         .querySelectorAll('.mic-btn')
         .forEach(b => b.classList.remove('active'));
+
+    hideDebugInfo();
 }
 
 // ============================
 function testSpeech() {
 
     speak("語音正常", "zh-TW");
+    showDebugInfo(`TTS 測試 | 語言: zh-TW | 裝置: ${isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'}`);
 }
 
 // ============================
 // INIT
 // ============================
+console.log("=== 語音翻譯官 初始化 ===");
+console.log("裝置類型:", { isIOS, isAndroid, isMobile });
+console.log("語言映射表:", RECOGNITION_LANG_MAP);
+
 initSpeech();
 initLangs();
 initRecognition();
@@ -572,4 +680,5 @@ initRecognition();
 
 </body>
 </html>
+
 
