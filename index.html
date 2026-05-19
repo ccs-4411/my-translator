@@ -154,7 +154,11 @@ select{
 }
 
 video{
+
     width:100%;
+    max-height:320px;
+    object-fit:cover;
+
     border-radius:20px;
     background:black;
     margin-top:10px;
@@ -194,6 +198,35 @@ canvas{
 
 #stopBtn{
     background:#ea4335;
+}
+
+#ocr-result-box{
+
+    background:#f8f9fa;
+    border-radius:20px;
+    padding:15px;
+    margin-top:15px;
+    text-align:left;
+
+}
+
+#ocrOriginal{
+
+    color:#666;
+    border-bottom:1px solid #ddd;
+    padding-bottom:10px;
+    white-space:pre-wrap;
+    font-size:0.95rem;
+
+}
+
+#ocrTranslated{
+
+    margin-top:12px;
+    font-size:1.5rem;
+    font-weight:bold;
+    white-space:pre-wrap;
+
 }
 
 .tip{
@@ -312,6 +345,24 @@ canvas{
 
         </div>
 
+        <!-- OCR 結果 -->
+
+        <div id="ocr-result-box">
+
+            <div id="ocrOriginal">
+
+                掃描文字會顯示在這裡
+
+            </div>
+
+            <div id="ocrTranslated">
+
+                翻譯結果
+
+            </div>
+
+        </div>
+
         <div class="tip">
             建議 HTTPS 才能使用相機
         </div>
@@ -328,8 +379,11 @@ canvas{
 
 let recognition = null;
 let VOICES = [];
+
 let lastSpeakText = "";
 let lastSpeakLang = "zh-TW";
+
+let currentStream = null;
 
 const video =
     document.getElementById("video");
@@ -630,16 +684,16 @@ async function startCamera(){
 
     try{
 
-        const stream =
-            await navigator.mediaDevices.getUserMedia({
+        currentStream =
+        await navigator.mediaDevices.getUserMedia({
 
-                video:{
-                    facingMode:"environment"
-                }
+            video:{
+                facingMode:"environment"
+            }
 
-            });
+        });
 
-        video.srcObject = stream;
+        video.srcObject = currentStream;
 
         document.getElementById("status")
             .innerText = "📷 相機已開啟";
@@ -693,10 +747,19 @@ async function scanText(){
         const text =
             result.data.text.trim();
 
-        document.getElementById("original")
+        document.getElementById("ocrOriginal")
             .innerText = text;
 
         handleOCRTranslation(text);
+
+        // 自動關閉相機
+        if(currentStream){
+
+            currentStream
+            .getTracks()
+            .forEach(track=>track.stop());
+
+        }
 
     }catch(err){
 
@@ -738,7 +801,7 @@ async function handleOCRTranslation(text){
         const data =
             await res.json();
 
-        document.getElementById("translated")
+        document.getElementById("ocrTranslated")
             .innerText = data.translatedText;
 
         lastSpeakText =
@@ -746,6 +809,11 @@ async function handleOCRTranslation(text){
 
         document.getElementById("status")
             .innerText = "完成";
+
+        speak(
+            data.translatedText,
+            "zh-TW"
+        );
 
     }catch(err){
 
