@@ -1,64 +1,179 @@
+# app.py
+
 import os
 import json
-from flask import Flask, request, jsonify, send_from_directory
+
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    send_from_directory
+)
+
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 
-app = Flask(__name__, static_folder='static')
+app = Flask(
+    __name__,
+    static_folder='static'
+)
+
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
+# =========================
+# 載入語言
+# =========================
 def load_languages():
-    lang_path = os.path.join(BASE_DIR, "languages.json")
+
+    lang_path = os.path.join(
+        BASE_DIR,
+        "languages.json"
+    )
+
     if os.path.exists(lang_path):
-        with open(lang_path, "r", encoding="utf-8") as f:
+
+        with open(
+            lang_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             return json.load(f)
+
     return []
 
 LANGUAGES = load_languages()
 
+# =========================
+# 取得語言代碼
+# =========================
 def get_lang_code(name):
+
     for lang in LANGUAGES:
+
         if lang["name"] == name:
             return lang["code"]
+
     return "en"
 
+# =========================
+# 首頁
+# =========================
 @app.route("/")
 def index():
-    return send_from_directory(BASE_DIR, "index.html")
 
+    return send_from_directory(
+        BASE_DIR,
+        "index.html"
+    )
+
+# =========================
+# manifest
+# =========================
 @app.route("/manifest.json")
 def serve_manifest():
-    return send_from_directory(BASE_DIR, "manifest.json")
 
+    return send_from_directory(
+        BASE_DIR,
+        "manifest.json"
+    )
+
+# =========================
+# service worker
+# =========================
+@app.route("/sw.js")
+def sw():
+
+    return send_from_directory(
+        "static",
+        "sw.js"
+    )
+
+# =========================
+# 語言列表
+# =========================
 @app.route("/languages")
 def get_langs():
+
     return jsonify(LANGUAGES)
 
+# =========================
+# 翻譯 API
+# =========================
 @app.route("/translate", methods=["POST"])
 def translate():
+
     try:
+
         data = request.get_json()
+
         text = data.get("text", "").strip()
+
         target_name = data.get("target", "")
+
         mode = data.get("mode", "me")
 
         if not text:
-            return jsonify({"translatedText": ""})
 
-        target_code = get_lang_code(target_name)
-        source, target = ("zh-TW", target_code) if mode == "me" else (target_code, "zh-TW")
+            return jsonify({
+                "translatedText": ""
+            })
 
-        result = GoogleTranslator(source=source, target=target).translate(text)
-        return jsonify({"translatedText": result})
+        target_code = get_lang_code(
+            target_name
+        )
+
+        # 中文 → 外語
+        if mode == "me":
+
+            source = "zh-TW"
+            target = target_code
+
+        # 外語 → 中文
+        else:
+
+            source = target_code
+            target = "zh-TW"
+
+        result = GoogleTranslator(
+            source=source,
+            target=target
+        ).translate(text)
+
+        return jsonify({
+            "translatedText": result
+        })
+
     except Exception as e:
-        return jsonify({"translatedText": "翻譯失敗"}), 500
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+        print("翻譯錯誤:", e)
 
+        return jsonify({
+            "translatedText": "翻譯失敗"
+        }), 500
+
+# =========================
+# Health Check
+# =========================
 @app.route('/health')
 def health():
+
     return "OK", 200
+
+# =========================
+# 啟動
+# =========================
+if __name__ == "__main__":
+
+    port = int(
+        os.environ.get("PORT", 10000)
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
