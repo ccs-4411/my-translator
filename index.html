@@ -153,15 +153,16 @@ select{
     display:none;
 }
 
-video{
+#previewImage{
 
     width:100%;
-    max-height:320px;
-    object-fit:cover;
-
     border-radius:20px;
-    background:black;
     margin-top:10px;
+    display:none;
+    max-height:420px;
+    object-fit:contain;
+    background:black;
+
 }
 
 canvas{
@@ -184,7 +185,7 @@ canvas{
     cursor:pointer;
 }
 
-#cameraBtn{
+#pickBtn{
     background:#1a73e8;
 }
 
@@ -235,6 +236,28 @@ canvas{
     font-size:0.85rem;
 }
 
+.loading{
+
+    animation:pulse 1s infinite;
+
+}
+
+@keyframes pulse{
+
+    0%{
+        opacity:1;
+    }
+
+    50%{
+        opacity:0.4;
+    }
+
+    100%{
+        opacity:1;
+    }
+
+}
+
 </style>
 
 </head>
@@ -262,6 +285,7 @@ canvas{
     </div>
 
     <!-- 語音翻譯 -->
+
     <div id="voicePage">
 
         <select id="target"></select>
@@ -313,22 +337,25 @@ canvas{
     </div>
 
     <!-- OCR -->
+
     <div id="ocrPage">
 
-        <video id="video"
-               autoplay
-               playsinline></video>
+        <input type="file"
+               id="imageInput"
+               accept="image/*"
+               capture="environment"
+               hidden>
 
-        <canvas id="canvas"></canvas>
+        <img id="previewImage">
 
         <div class="ocr-buttons">
 
-            <button id="cameraBtn">
-                📷 開啟相機
+            <button id="pickBtn">
+                📷 拍照 / 選圖片
             </button>
 
             <button id="scanBtn">
-                🔍 掃描
+                🔍 開始辨識
             </button>
 
         </div>
@@ -344,8 +371,6 @@ canvas{
             </button>
 
         </div>
-
-        <!-- OCR 結果 -->
 
         <div id="ocr-result-box">
 
@@ -364,7 +389,12 @@ canvas{
         </div>
 
         <div class="tip">
-            建議 HTTPS 才能使用相機
+
+            建議：
+            拍近一點、
+            保持穩定、
+            橫式文字效果最好
+
         </div>
 
     </div>
@@ -383,16 +413,7 @@ let VOICES = [];
 let lastSpeakText = "";
 let lastSpeakLang = "zh-TW";
 
-let currentStream = null;
-
-const video =
-    document.getElementById("video");
-
-const canvas =
-    document.getElementById("canvas");
-
-const ctx =
-    canvas.getContext("2d");
+let selectedImage = null;
 
 // =====================
 // Service Worker
@@ -402,22 +423,16 @@ if('serviceWorker' in navigator){
 
     navigator.serviceWorker
     .register('/sw.js')
-
     .then(()=>{
 
         console.log("SW OK");
 
-    })
-
-    .catch(err=>{
-
-        console.log(err);
-
     });
+
 }
 
 // =====================
-// 模式切換
+// 頁面切換
 // =====================
 
 function showVoicePage(){
@@ -450,6 +465,7 @@ function loadVoices(){
             speechSynthesis.getVoices();
 
         if(voices.length){
+
             return resolve(voices);
         }
 
@@ -677,50 +693,57 @@ function replayAudio(){
 }
 
 // =====================
-// OCR 相機
+// OCR 圖片選擇
 // =====================
 
-async function startCamera(){
+document
+.getElementById("pickBtn")
+.addEventListener(
+    "click",
+    ()=>{
 
-    try{
+        document
+        .getElementById("imageInput")
+        .click();
 
-        currentStream =
-        await navigator.mediaDevices.getUserMedia({
-
-            video:{
-                facingMode:"environment"
-            }
-
-        });
-
-        video.srcObject = currentStream;
-
-        document.getElementById("status")
-            .innerText = "📷 相機已開啟";
-
-    }catch(err){
-
-        document.getElementById("status")
-            .innerText = "⚠️ 相機失敗";
     }
-}
+);
 
-function captureFrame(){
+document
+.getElementById("imageInput")
+.addEventListener(
+    "change",
+    (e)=>{
 
-    canvas.width =
-        video.videoWidth;
+        const file =
+            e.target.files[0];
 
-    canvas.height =
-        video.videoHeight;
+        if(!file) return;
 
-    ctx.drawImage(
-        video,
-        0,
-        0
-    );
+        selectedImage = file;
 
-    return canvas;
-}
+        const reader =
+            new FileReader();
+
+        reader.onload = function(ev){
+
+            const img =
+                document.getElementById(
+                    "previewImage"
+                );
+
+            img.src = ev.target.result;
+
+            img.style.display = "block";
+
+            document.getElementById("status")
+                .innerText = "📷 圖片已載入";
+        };
+
+        reader.readAsDataURL(file);
+
+    }
+);
 
 // =====================
 // OCR 掃描
@@ -728,44 +751,48 @@ function captureFrame(){
 
 async function scanText(){
 
+    if(!selectedImage){
+
+        alert("請先拍照或選圖片");
+        return;
+    }
+
     document.getElementById("status")
-        .innerText = "OCR 掃描中...";
+        .innerText = "🔍 OCR 辨識中...";
+
+    document.getElementById("ocr-result-box")
+        .classList.add("loading");
 
     try{
-
-        const image =
-            captureFrame();
 
         const result =
             await Tesseract.recognize(
 
-                image,
+                selectedImage,
 
-                "chi_tra+jpn+eng+kor"
+                "jpn+eng+chi_tra+kor"
             );
 
-        const text =
+        let text =
             result.data.text.trim();
+
+        text = text
+               .replace(/\n{3,}/g,"\n\n");
 
         document.getElementById("ocrOriginal")
             .innerText = text;
 
-        handleOCRTranslation(text);
-
-        // 自動關閉相機
-        if(currentStream){
-
-            currentStream
-            .getTracks()
-            .forEach(track=>track.stop());
-
-        }
+        await handleOCRTranslation(text);
 
     }catch(err){
 
         document.getElementById("status")
             .innerText = "OCR 失敗";
+
     }
+
+    document.getElementById("ocr-result-box")
+        .classList.remove("loading");
 }
 
 // =====================
@@ -808,7 +835,7 @@ async function handleOCRTranslation(text){
             data.translatedText;
 
         document.getElementById("status")
-            .innerText = "完成";
+            .innerText = "✅ 完成";
 
         speak(
             data.translatedText,
@@ -825,13 +852,6 @@ async function handleOCRTranslation(text){
 // =====================
 // OCR 按鈕
 // =====================
-
-document
-.getElementById("cameraBtn")
-.addEventListener(
-    "click",
-    startCamera
-);
 
 document
 .getElementById("scanBtn")
