@@ -2,7 +2,8 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
 
 <title>AI OCR 相機翻譯</title>
 
@@ -19,11 +20,11 @@ body{
 }
 
 .card{
-    max-width:500px;
+    max-width:520px;
     margin:auto;
     background:white;
-    border-radius:30px;
     padding:20px;
+    border-radius:30px;
     box-shadow:0 10px 30px rgba(0,0,0,0.1);
 }
 
@@ -36,7 +37,7 @@ h2{
     color:#1a73e8;
     font-weight:bold;
     margin-bottom:15px;
-    min-height:1.2em;
+    min-height:1.4em;
 }
 
 video{
@@ -53,10 +54,12 @@ canvas{
     display:flex;
     gap:10px;
     margin-top:15px;
+    flex-wrap:wrap;
 }
 
 button{
     flex:1;
+    min-width:120px;
     border:none;
     border-radius:15px;
     padding:15px;
@@ -66,12 +69,16 @@ button{
     color:white;
 }
 
-#scanBtn{
+#cameraBtn{
     background:#1a73e8;
 }
 
-#speakBtn{
+#scanBtn{
     background:#34a853;
+}
+
+#speakBtn{
+    background:#ff9800;
 }
 
 #stopBtn{
@@ -105,6 +112,7 @@ select{
     min-height:60px;
     white-space:pre-wrap;
     font-size:1rem;
+    color:#444;
 }
 
 #translatedText{
@@ -113,6 +121,12 @@ select{
     font-weight:bold;
     color:#111;
     white-space:pre-wrap;
+}
+
+.tip{
+    margin-top:10px;
+    font-size:0.85rem;
+    color:#777;
 }
 
 </style>
@@ -125,11 +139,12 @@ select{
     <h2>📷 AI OCR 相機翻譯</h2>
 
     <div id="status">
-        啟動中...
+        等待開啟相機
     </div>
 
     <select id="targetLang">
 
+        <option value="中文">中文</option>
         <option value="英文">英文 English</option>
         <option value="日文">日文 日本語</option>
         <option value="韓文">韓文 한국어</option>
@@ -148,8 +163,12 @@ select{
 
     <div class="controls">
 
+        <button id="cameraBtn">
+            📷 開啟相機
+        </button>
+
         <button id="scanBtn">
-            📸 掃描翻譯
+            🔍 掃描翻譯
         </button>
 
         <button id="speakBtn">
@@ -160,6 +179,10 @@ select{
             ⛔ 停止
         </button>
 
+    </div>
+
+    <div class="tip">
+        建議使用 HTTPS 網站或 localhost
     </div>
 
     <div class="result-box">
@@ -207,14 +230,18 @@ const translatedDiv =
     document.getElementById("translatedText");
 
 let lastTranslated = "";
+
 let isScanning = false;
 
 // ========================
-// 啟動相機
+// 開啟相機
 // ========================
 async function startCamera(){
 
     try{
+
+        statusDiv.innerText =
+            "📷 開啟相機中...";
 
         const stream =
             await navigator.mediaDevices.getUserMedia({
@@ -230,7 +257,7 @@ async function startCamera(){
         video.srcObject = stream;
 
         statusDiv.innerText =
-            "📷 相機已啟動";
+            "✅ 相機已開啟";
 
     }catch(err){
 
@@ -238,6 +265,10 @@ async function startCamera(){
 
         statusDiv.innerText =
             "⚠️ 無法開啟相機";
+
+        alert(
+            "請確認：\n\n1. 已允許相機權限\n2. 使用 HTTPS 網站\n3. 瀏覽器支援 getUserMedia"
+        );
     }
 }
 
@@ -270,6 +301,14 @@ async function scanText(){
 
     if(isScanning) return;
 
+    if(!video.srcObject){
+
+        statusDiv.innerText =
+            "⚠️ 請先開啟相機";
+
+        return;
+    }
+
     isScanning = true;
 
     translatedDiv.innerText = "";
@@ -291,9 +330,13 @@ async function scanText(){
                 "chi_tra+jpn+eng+kor",
 
                 {
+
                     logger:m=>{
 
-                        if(m.status==="recognizing text"){
+                        if(
+                            m.status ===
+                            "recognizing text"
+                        ){
 
                             statusDiv.innerText =
                                 `🔍 OCR 辨識中 ${Math.floor(m.progress*100)}%`;
@@ -310,6 +353,9 @@ async function scanText(){
             ocrTextDiv.innerText =
                 "⚠️ 沒有辨識到文字";
 
+            translatedDiv.innerText =
+                "";
+
             statusDiv.innerText =
                 "完成";
 
@@ -317,7 +363,8 @@ async function scanText(){
             return;
         }
 
-        ocrTextDiv.innerText = text;
+        ocrTextDiv.innerText =
+            text;
 
         statusDiv.innerText =
             "🌐 翻譯中...";
@@ -346,6 +393,15 @@ async function translateText(text){
         const target =
             document.getElementById("targetLang").value;
 
+        const controller =
+            new AbortController();
+
+        setTimeout(()=>{
+
+            controller.abort();
+
+        },15000);
+
         const res =
             await fetch("/translate",{
 
@@ -354,6 +410,8 @@ async function translateText(text){
                 headers:{
                     "Content-Type":"application/json"
                 },
+
+                signal:controller.signal,
 
                 body:JSON.stringify({
 
@@ -386,7 +444,7 @@ async function translateText(text){
             data.translatedText;
 
         statusDiv.innerText =
-            "✅ 完成";
+            "✅ 翻譯完成";
 
     }catch(err){
 
@@ -403,17 +461,24 @@ async function translateText(text){
 // ========================
 // 語音播放
 // ========================
-function speakText(){
+async function speakText(){
 
     if(!lastTranslated){
 
         statusDiv.innerText =
-            "沒有可播放內容";
+            "⚠️ 沒有可播放內容";
 
         return;
     }
 
-    speechSynthesis.cancel();
+    if(speechSynthesis.speaking){
+
+        speechSynthesis.cancel();
+
+        await new Promise(r=>
+            setTimeout(r,150)
+        );
+    }
 
     const msg =
         new SpeechSynthesisUtterance(
@@ -427,6 +492,9 @@ function speakText(){
         speechSynthesis.speak(msg);
 
     },120);
+
+    statusDiv.innerText =
+        "🔊 播放中...";
 }
 
 // ========================
@@ -441,24 +509,35 @@ function stopSpeak(){
 }
 
 // ========================
-// 按鈕
+// 按鈕事件
 // ========================
 document
+    .getElementById("cameraBtn")
+    .addEventListener(
+        "click",
+        startCamera
+    );
+
+document
     .getElementById("scanBtn")
-    .addEventListener("click",scanText);
+    .addEventListener(
+        "click",
+        scanText
+    );
 
 document
     .getElementById("speakBtn")
-    .addEventListener("click",speakText);
+    .addEventListener(
+        "click",
+        speakText
+    );
 
 document
     .getElementById("stopBtn")
-    .addEventListener("click",stopSpeak);
-
-// ========================
-// 初始化
-// ========================
-startCamera();
+    .addEventListener(
+        "click",
+        stopSpeak
+    );
 
 </script>
 
