@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>語音翻譯官</title>
+<title>語音翻譯官 - 背包客版</title>
 
 <style>
 body {
@@ -30,12 +30,19 @@ h2 {
     cursor:pointer;
 }
 
+.subtitle {
+    font-size:12px;
+    color:#888;
+    margin-top:-5px;
+    margin-bottom:15px;
+}
+
 #status {
     font-size:0.95rem;
     color:#1a73e8;
     margin-bottom:12px;
     font-weight:bold;
-    height:1.2em;
+    min-height:1.2em;
 }
 
 select {
@@ -47,35 +54,72 @@ select {
     margin-bottom:10px;
 }
 
-.btn-group {
-    display:flex;
-    gap:12px;
+/* 單按鈕模式 */
+.single-btn {
+    width:100%;
+    height:160px;
+    border:none;
+    border-radius:30px;
+    background:#1a73e8;
+    color:white;
+    font-size:1.6rem;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.2s;
     margin:20px 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
 }
 
-.mic-btn {
+.single-btn .big-icon {
+    font-size:3rem;
+}
+
+.single-btn .small-text {
+    font-size:0.9rem;
+    opacity:0.9;
+}
+
+.single-btn.active {
+    background:#ea4335 !important;
+    transform:scale(0.97);
+}
+
+.single-btn.recording {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.02); opacity: 0.9; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.mode-switch {
+    display:flex;
+    gap:12px;
+    margin-bottom:15px;
+}
+
+.mode-btn {
     flex:1;
-    height:120px;
+    padding:12px;
     border:none;
-    border-radius:25px;
-    color:white;
-    font-size:1.2rem;
-    cursor:pointer;
+    border-radius:20px;
+    font-size:1rem;
     font-weight:bold;
+    cursor:pointer;
+    background:#e0e0e0;
+    color:#555;
     transition:0.2s;
 }
 
-#btn-me {
+.mode-btn.active {
     background:#1a73e8;
-}
-
-#btn-other {
-    background:#34a853;
-}
-
-.active {
-    background:#ea4335 !important;
-    transform:scale(0.97);
+    color:white;
 }
 
 #result-box {
@@ -91,6 +135,7 @@ select {
     border-bottom:1px solid #eee;
     padding-bottom:8px;
     font-size:1rem;
+    word-break:break-word;
 }
 
 #translated {
@@ -98,16 +143,16 @@ select {
     font-weight:bold;
     margin-top:12px;
     color:#111;
+    word-break:break-word;
 }
 
-/* ⭐ 重播按鈕 */
-.play-group{
+.play-group {
     display:flex;
     gap:10px;
     margin-top:15px;
 }
 
-.play-btn{
+.play-btn {
     flex:1;
     padding:14px;
     border:none;
@@ -118,8 +163,34 @@ select {
     cursor:pointer;
 }
 
-#replay-btn{
+#replay-btn {
     background:#ff9800;
+}
+
+#copy-btn {
+    background:#34a853;
+}
+
+.engine-badge {
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:rgba(0,0,0,0.75);
+    color:white;
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:11px;
+    z-index:1000;
+    pointer-events:none;
+    transition:opacity 0.5s;
+    font-weight:500;
+    backdrop-filter:blur(5px);
+}
+
+@media (max-width:500px) {
+    .single-btn { height:140px; font-size:1.3rem; }
+    #translated { font-size:1.3rem; }
+    .engine-badge { font-size:10px; padding:4px 10px; }
 }
 </style>
 </head>
@@ -128,448 +199,411 @@ select {
 
 <div class="card">
 
-    <h2 onclick="testSpeech()">語音翻譯官</h2>
+    <h2 onclick="testSpeech()">🎙️ 語音翻譯官</h2>
+    <div class="subtitle">點擊說話 | AI 即時翻譯</div>
 
-    <div id="status">準備就緒</div>
+    <div id="status">✅ 準備就緒</div>
 
+    <!-- 語言選擇 -->
     <select id="target"></select>
 
-    <div class="btn-group">
-
-        <button id="btn-me"
-                class="mic-btn"
-                onclick="runMic('me')">
-
-            🎤 我講中文
-
-        </button>
-
-        <button id="btn-other"
-                class="mic-btn"
-                onclick="runMic('other')">
-
-            🎧 對方講
-
-        </button>
-
+    <!-- 模式切換 -->
+    <div class="mode-switch">
+        <button class="mode-btn active" data-mode="me">🇹🇼 我說中文</button>
+        <button class="mode-btn" data-mode="other">🌍 對方說外語</button>
     </div>
 
+    <!-- 單按鈕 -->
+    <button id="mic-btn" class="single-btn" onclick="toggleRecording()">
+        <span class="big-icon">🎤</span>
+        <span class="small-text">點擊開始說話</span>
+    </button>
+
     <div id="result-box">
+        <div id="original">等待說話...</div>
+        <div id="translated">翻譯結果</div>
 
-        <div id="original">
-            等待說話...
-        </div>
-
-        <div id="translated">
-            翻譯結果
-        </div>
-
-        <!-- ⭐ 重播 -->
         <div class="play-group">
-
-            <button id="replay-btn"
-                    class="play-btn"
-                    onclick="replayAudio()">
-
-                🔊 重播
-
-            </button>
-
+            <button id="replay-btn" class="play-btn" onclick="replayAudio()">🔊 重播</button>
+            <button id="copy-btn" class="play-btn" onclick="copyText()">📋 複製</button>
         </div>
-
     </div>
 
 </div>
 
 <script>
 
+// ======================= 全域變數 =======================
 let recognition = null;
-let isProcessing = false;
-let VOICES = [];
-let audioUnlocked = false;
-
-/* ⭐ 記錄最後播放 */
+let isRecording = false;
+let currentMode = 'me';
+let voices = [];
 let lastSpeakText = "";
 let lastSpeakLang = "";
+let currentApiKey = "";
 
-// ============================
-// ⭐ 1. 載入語音
-// ============================
-function loadVoices() {
+// 語言資料
+let languageList = [];
 
-    return new Promise(resolve => {
+// 引擎標記
+let engineBadge = null;
 
-        let voices = speechSynthesis.getVoices();
+// DOM 元素
+const micBtn = document.getElementById("mic-btn");
+const originalDiv = document.getElementById("original");
+const translatedDiv = document.getElementById("translated");
+const langSelect = document.getElementById("target");
+const statusDiv = document.getElementById("status");
+const modeBtns = document.querySelectorAll(".mode-btn");
 
-        if (voices.length) {
-            return resolve(voices);
+// ======================= 引擎標記 =======================
+function showEngineBadge(engine) {
+    if (!engineBadge) {
+        engineBadge = document.createElement('div');
+        engineBadge.className = 'engine-badge';
+        document.body.appendChild(engineBadge);
+    }
+
+    const engineName = engine === 'Gemini' ? '🤖 Gemini AI' : '🌐 Google 翻譯';
+    engineBadge.textContent = engineName;
+    engineBadge.style.opacity = '1';
+
+    setTimeout(() => {
+        engineBadge.style.opacity = '0';
+    }, 2000);
+}
+
+// ======================= 複製功能 =======================
+async function copyText() {
+    const text = translatedDiv.innerText;
+    if (text && text !== "翻譯結果" && text !== "...") {
+        try {
+            await navigator.clipboard.writeText(text);
+            statusDiv.innerText = "✅ 已複製到剪貼簿";
+            setTimeout(() => {
+                statusDiv.innerText = "✅ 準備就緒";
+            }, 2000);
+        } catch(err) {
+            statusDiv.innerText = "❌ 複製失敗";
         }
+    } else {
+        statusDiv.innerText = "⚠️ 沒有可複製的內容";
+    }
+}
 
-        speechSynthesis.onvoiceschanged = () => {
-            resolve(speechSynthesis.getVoices());
-        };
-
+// ======================= 模式切換 =======================
+modeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+        modeBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentMode = btn.getAttribute("data-mode");
+        
+        // 更新按鈕提示文字
+        const smallText = micBtn.querySelector(".small-text");
+        if (currentMode === 'me') {
+            smallText.textContent = "說中文，會翻譯成外語";
+        } else {
+            smallText.textContent = "說外語，會翻譯成中文";
+        }
+        
+        statusDiv.innerText = `✅ 已切換到 ${currentMode === 'me' ? '我說中文' : '對方說外語'} 模式`;
     });
-}
+});
 
-async function initSpeech() {
-    VOICES = await loadVoices();
-}
-
-// ============================
-// ⭐ 2. 解鎖音訊
-// ============================
-document.body.addEventListener("click", () => {
-
-    if (!audioUnlocked) {
-
-        speechSynthesis.speak(
-            new SpeechSynthesisUtterance("")
-        );
-
-        audioUnlocked = true;
-    }
-
-}, { once: true });
-
-// ============================
-// ⭐ 3. 初始化語言
-// ============================
-async function initLangs() {
-
+// ======================= 語言載入 =======================
+async function loadLanguages() {
     try {
+        const response = await fetch('/languages.json?v=' + Date.now());
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const languages = await response.json();
 
-        const res =
-            await fetch("/languages?v=" + Date.now());
-
-        const langs = await res.json();
-
-        const sel =
-            document.getElementById("target");
-
-        sel.innerHTML = "";
-
-        langs.forEach(l => {
-
-            const opt =
-                document.createElement("option");
-
-            opt.value = l.name;
-
-            opt.textContent =
-                `${l.name} ${l.label}`;
-
-            opt.dataset.v = l.voice;
-
-            sel.appendChild(opt);
-
-        });
-
-        const saved =
-            localStorage.getItem("targetLang");
-
-        if (saved) {
-            sel.value = saved;
+        if (!Array.isArray(languages) || languages.length === 0) {
+            throw new Error("語系檔案格式錯誤");
         }
 
-        sync();
+        languageList = languages;
+        langSelect.innerHTML = "";
 
-    } catch(e) {
+        for (let lang of languageList) {
+            const option = document.createElement("option");
+            option.value = lang.name;
+            const displayText = lang.label ? `${lang.name} (${lang.label})` : lang.name;
+            option.textContent = displayText;
+            option.setAttribute("data-voice", lang.voice || "");
+            option.setAttribute("data-code", lang.code || "");
+            option.setAttribute("data-name", lang.name);
+            langSelect.appendChild(option);
+        }
 
-        document.getElementById("status").innerText =
-            "語言載入失敗";
+        const savedLang = localStorage.getItem("target_lang_name");
+        if (savedLang) {
+            for (let i = 0; i < langSelect.options.length; i++) {
+                if (langSelect.options[i].getAttribute("data-name") === savedLang) {
+                    langSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        console.log("✅ 語言選單已載入");
+        return true;
+    } catch (err) {
+        console.error("載入失敗:", err);
+        langSelect.innerHTML = '<option disabled>⚠️ 無法載入語言</option>';
+        return false;
     }
 }
 
-function sync() {
+langSelect.addEventListener("change", () => {
+    const selected = langSelect.options[langSelect.selectedIndex];
+    if (selected) {
+        const langName = selected.getAttribute("data-name");
+        localStorage.setItem("target_lang_name", langName);
+    }
+});
 
-    const sel =
-        document.getElementById("target");
-
-    localStorage.setItem(
-        "targetLang",
-        sel.value
-    );
+function getCurrentLanguageInfo() {
+    const selected = langSelect.options[langSelect.selectedIndex];
+    if (!selected) return null;
+    return {
+        name: selected.getAttribute("data-name") || selected.value,
+        code: selected.getAttribute("data-code") || "",
+        voice: selected.getAttribute("data-voice") || ""
+    };
 }
 
-document
-    .getElementById("target")
-    .addEventListener("change", sync);
+// ======================= API Key 管理 =======================
+function loadApiKey() {
+    const saved = localStorage.getItem("gemini_api_key");
+    if (saved && saved.trim() !== "") {
+        currentApiKey = saved;
+        return true;
+    }
+    currentApiKey = "";
+    return false;
+}
 
-// ============================
-// ⭐ 4. 語音辨識
-// ============================
+// ======================= 語音合成 =======================
+function loadVoices() { 
+    voices = speechSynthesis.getVoices(); 
+}
+speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function speak(text, targetVoiceLang) {
+    if (!text) return;
+    lastSpeakText = text;
+    lastSpeakLang = targetVoiceLang;
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = targetVoiceLang;
+    utter.rate = 0.9;
+
+    let match = voices.find(v => v.lang === targetVoiceLang || v.lang.startsWith(targetVoiceLang.split('-')[0]));
+    if (match) utter.voice = match;
+    speechSynthesis.speak(utter);
+}
+
+function replayAudio() {
+    if (lastSpeakText && lastSpeakLang) {
+        speak(lastSpeakText, lastSpeakLang);
+        statusDiv.innerText = "🔊 重播中";
+        setTimeout(() => {
+            statusDiv.innerText = "✅ 準備就緒";
+        }, 1500);
+    } else {
+        statusDiv.innerText = "⚠️ 沒有可重播的內容";
+    }
+}
+
+// ======================= 語音辨識 =======================
 function initRecognition() {
+    const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecog) {
+        statusDiv.innerText = "❌ 瀏覽器不支援語音辨識";
+        return null;
+    }
 
-    const Speech =
-        window.webkitSpeechRecognition ||
-        window.SpeechRecognition;
+    const recog = new SpeechRecog();
+    recog.continuous = false;
+    recog.interimResults = false;
 
-    if (!Speech) {
+    recog.onresult = async (e) => {
+        const text = e.results[0][0].transcript;
+        originalDiv.innerText = text;
+        await translate(text);
+    };
 
-        document.getElementById("status").innerText =
-            "不支援語音";
+    recog.onerror = (e) => {
+        console.log("語音錯誤:", e.error);
+        isRecording = false;
+        micBtn.classList.remove("active", "recording");
+        
+        const smallText = micBtn.querySelector(".small-text");
+        smallText.textContent = "點擊開始說話";
+        
+        if (e.error === "not-allowed") {
+            originalDiv.innerText = "❌ 請允許麥克風權限";
+            statusDiv.innerText = "❌ 麥克風權限被封鎖";
+        } else if (e.error === "no-speech") {
+            originalDiv.innerText = "❌ 沒有偵測到語音";
+            statusDiv.innerText = "⚠️ 沒有聽到聲音，請再試一次";
+        } else {
+            originalDiv.innerText = `❌ 語音錯誤: ${e.error}`;
+            statusDiv.innerText = "⚠️ 語音辨識失敗";
+        }
+    };
 
+    recog.onend = () => {
+        isRecording = false;
+        micBtn.classList.remove("active", "recording");
+        const smallText = micBtn.querySelector(".small-text");
+        smallText.textContent = "點擊開始說話";
+    };
+
+    return recog;
+}
+
+// 核心翻譯函式
+async function translate(text) {
+    const targetLangInfo = getCurrentLanguageInfo();
+    if (!targetLangInfo) {
+        translatedDiv.innerText = "❌ 無效的目標語言";
+        statusDiv.innerText = "❌ 語言選擇錯誤";
         return;
     }
 
-    recognition = new Speech();
+    const targetName = targetLangInfo.name;
+    translatedDiv.innerText = "⚡ 翻譯中...";
+    statusDiv.innerText = "🔄 翻譯中...";
 
-    recognition.continuous = false;
+    try {
+        const response = await fetch('/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: text,
+                target: targetName,
+                mode: currentMode,
+                apiKey: currentApiKey || ""
+            })
+        });
 
-    recognition.onresult = (e) => {
+        const data = await response.json();
 
-        const text =
-            e.results[0][0].transcript;
+        if (data.error) {
+            translatedDiv.innerText = "❌ " + data.error;
+            statusDiv.innerText = "❌ 翻譯失敗";
+        } else if (data.translatedText) {
+            translatedDiv.innerText = data.translatedText;
+            statusDiv.innerText = "✅ 翻譯完成";
 
-        document.getElementById("original")
-            .innerText = text;
+            if (data.engine) {
+                showEngineBadge(data.engine);
+            }
 
-        handleTranslation(text);
-    };
-
-    // ⭐ 改良錯誤提示
-    recognition.onerror = (e) => {
-
-        console.log(e.error);
-
-        if (
-            e.error === "service-not-allowed" ||
-            e.error === "language-not-supported"
-        ) {
-
-            document.getElementById("status").innerText =
-                "⚠️ 此語言可能不支援語音翻譯";
-
-        } else if (e.error === "no-speech") {
-
-            document.getElementById("status").innerText =
-                "⚠️ 沒有聽到聲音";
-
-        } else {
-
-            document.getElementById("status").innerText =
-                "⚠️ 語音辨識失敗";
+            let speakVoiceLang = "";
+            if (currentMode === 'me') {
+                speakVoiceLang = targetLangInfo.voice || "en-US";
+            } else {
+                speakVoiceLang = "zh-TW";
+            }
+            if (speakVoiceLang) {
+                speak(data.translatedText, speakVoiceLang);
+            }
         }
-
-        resetUI();
-    };
-
-    recognition.onend = resetUI;
+    } catch (err) {
+        console.error(err);
+        translatedDiv.innerText = "❌ 網路錯誤";
+        statusDiv.innerText = "❌ 連線失敗";
+    }
 }
 
-// ============================
-// ⭐ 5. 麥克風
-// ============================
-function runMic(mode) {
+// 切換錄音
+function toggleRecording() {
+    if (isRecording) {
+        if (recognition) {
+            recognition.stop();
+        }
+        return;
+    }
+    
+    startRecording();
+}
 
-    if (isProcessing) return;
+function startRecording() {
+    const targetLangInfo = getCurrentLanguageInfo();
+    if (!targetLangInfo && currentMode === 'other') {
+        originalDiv.innerText = "❌ 請確認語言選單正確";
+        statusDiv.innerText = "❌ 請選擇語言";
+        return;
+    }
 
     speechSynthesis.cancel();
 
     if (!recognition) {
-        initRecognition();
+        recognition = initRecognition();
+        if (!recognition) return;
     }
 
-    const sel =
-        document.getElementById("target");
+    // 設定辨識語言
+    if (currentMode === 'me') {
+        recognition.lang = 'zh-TW';
+    } else {
+        let foreignCode = targetLangInfo.code || "en-US";
+        if (foreignCode === 'ja') foreignCode = 'ja-JP';
+        if (foreignCode === 'ko') foreignCode = 'ko-KR';
+        if (foreignCode === 'vi') foreignCode = 'vi-VN';
+        if (foreignCode === 'th') foreignCode = 'th-TH';
+        recognition.lang = foreignCode;
+    }
 
-    const isMe = (mode === "me");
-
-    recognition.lang =
-        isMe
-        ? "zh-TW"
-        : sel.selectedOptions[0].dataset.v;
-
-    document
-        .querySelectorAll('.mic-btn')
-        .forEach(b => b.classList.remove('active'));
-
-    document
-        .getElementById(
-            isMe ? "btn-me" : "btn-other"
-        )
-        .classList.add("active");
+    isRecording = true;
+    micBtn.classList.add("active", "recording");
+    
+    const smallText = micBtn.querySelector(".small-text");
+    smallText.textContent = "🎙️ 聆聽中... 點擊停止";
+    
+    originalDiv.innerText = "🎙️ 請開始說話...";
+    translatedDiv.innerText = "...";
+    statusDiv.innerText = "🎤 聆聽中...";
 
     try {
-        recognition.abort();
-    } catch(e) {}
-
-    setTimeout(() => {
-
-        try {
-
-            recognition.start();
-
-            document.getElementById("status")
-                .innerText = "🎤 聆聽中...";
-
-        } catch(err) {
-
-            document.getElementById("status")
-                .innerText = "⚠️ 無法啟動語音辨識";
-        }
-
-    }, 300);
-}
-
-// ============================
-// ⭐ 6. 翻譯
-// ============================
-async function handleTranslation(text) {
-
-    isProcessing = true;
-
-    document.getElementById("status")
-        .innerText = "翻譯中...";
-
-    const sel =
-        document.getElementById("target");
-
-    const isMe =
-        (recognition.lang === "zh-TW");
-
-    try {
-
-        const res = await fetch("/translate", {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type":"application/json"
-            },
-
-            body: JSON.stringify({
-                text,
-                target: sel.value,
-                mode: isMe ? "me" : "other"
-            })
-
-        });
-
-        const data = await res.json();
-
-        // ⭐ 防止空翻譯
-        if (!data.translatedText) {
-
-            document.getElementById("translated")
-                .innerText = "⚠️ 無法翻譯";
-
-            document.getElementById("status")
-                .innerText = "翻譯失敗";
-
-            isProcessing = false;
-            return;
-        }
-
-        document.getElementById("translated")
-            .innerText = data.translatedText;
-
-        document.getElementById("status")
-            .innerText = "完成";
-
-        const playLang =
-            isMe
-            ? sel.selectedOptions[0].dataset.v
-            : "zh-TW";
-
-        speak(data.translatedText, playLang);
-
-    } catch(err) {
-
-        document.getElementById("translated")
-            .innerText = "⚠️ 翻譯失敗";
-
-        document.getElementById("status")
-            .innerText = "翻譯失敗";
+        recognition.start();
+    } catch(e) {
+        isRecording = false;
+        micBtn.classList.remove("active", "recording");
+        smallText.textContent = "點擊開始說話";
+        originalDiv.innerText = "❌ 無法啟動麥克風";
+        statusDiv.innerText = "❌ 麥克風啟動失敗";
+        console.error(e);
     }
-
-    isProcessing = false;
 }
 
-// ============================
-// ⭐ 7. 語音播放
-// ============================
-function speak(text, lang) {
-
-    /* ⭐ 記住最後播放 */
-    lastSpeakText = text;
-    lastSpeakLang = lang;
-
-    speechSynthesis.cancel();
-
-    const msg =
-        new SpeechSynthesisUtterance(text);
-
-    const voice =
-
-        VOICES.find(v =>
-            v.lang.replace('_','-') === lang
-        )
-
-        ||
-
-        VOICES.find(v =>
-            v.lang.startsWith(
-                lang.split('-')[0]
-            )
-        );
-
-    if (voice) {
-        msg.voice = voice;
-    }
-
-    msg.lang = lang;
-
-    setTimeout(() => {
-
-        speechSynthesis.speak(msg);
-
-    }, 120);
-}
-
-// ============================
-// ⭐ 8. 重播
-// ============================
-function replayAudio() {
-
-    if (!lastSpeakText) {
-
-        document.getElementById("status")
-            .innerText = "沒有可重播內容";
-
-        return;
-    }
-
-    document.getElementById("status")
-        .innerText = "🔊 重播中...";
-
-    speak(lastSpeakText, lastSpeakLang);
-}
-
-// ============================
-function resetUI() {
-
-    document
-        .querySelectorAll('.mic-btn')
-        .forEach(b => b.classList.remove('active'));
-}
-
-// ============================
+// 測試語音
 function testSpeech() {
-
-    speak("語音正常", "zh-TW");
+    speak("語音功能正常，請點擊麥克風開始翻譯", "zh-TW");
+    statusDiv.innerText = "🔊 語音測試中";
+    setTimeout(() => {
+        statusDiv.innerText = "✅ 準備就緒";
+    }, 2000);
 }
 
-// ============================
-// INIT
-// ============================
-initSpeech();
-initLangs();
-initRecognition();
+// ======================= 初始化 =======================
+async function initApp() {
+    await loadLanguages();
+    loadApiKey();
+}
+
+initApp();
+
+// 暴露全域函數
+window.toggleRecording = toggleRecording;
+window.replayAudio = replayAudio;
+window.copyText = copyText;
+window.testSpeech = testSpeech;
 
 </script>
-
 </body>
 </html>
 
