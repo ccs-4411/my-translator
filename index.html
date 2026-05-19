@@ -67,7 +67,6 @@
             box-sizing: border-box;
         }
 
-        /* 為掃描頁面特別設計的提示標籤與選單樣式 */
         .select-group {
             text-align: left;
             margin-bottom: 10px;
@@ -260,12 +259,10 @@
 
     <div id="status">準備就緒</div>
 
-    <!-- 語音翻譯頁面 -->
+    <!-- 語音翻譯 -->
     <div id="voicePage">
-        <div class="select-group">
-            <label>請選擇翻譯目標語言：</label>
-            <select id="target"></select>
-        </div>
+        <!-- 保持原狀：由原來的 json 動態載入 -->
+        <select id="target"></select>
 
         <div class="btn-group">
             <button id="btn-me" class="mic-btn" onclick="runMic('me')">🎤 我講中文</button>
@@ -281,9 +278,9 @@
         </div>
     </div>
 
-    <!-- 掃描翻譯頁面 (OCR) -->
+    <!-- OCR 掃描翻譯 -->
     <div id="ocrPage">
-        <!-- 核心修正點：讓使用者選擇目前圖片內是什麼語言，避免字型庫衝突 -->
+        <!-- 新增的獨立圖片語言選單，確保 Tesseract.js 不會混亂 -->
         <div class="select-group">
             <label>請選擇圖片中的文字語言：</label>
             <select id="ocrImageLang">
@@ -313,10 +310,7 @@
         </div>
 
         <div class="tip">
-            <strong>優化辨識小訣竅：</strong><br>
-            1. 精準選擇上面的「圖片文字語言」<br>
-            2. 盡量靠進拍攝、拿穩手機避免晃動模糊<br>
-            3. 注意光線，避免陰影直接遮擋文字
+            <strong>建議：</strong>拍近一點、保持穩定、精準選擇圖片文字語言效果最好。
         </div>
     </div>
 </div>
@@ -354,7 +348,7 @@ function showOCRPage() {
 }
 
 // =====================
-// 語音輸出 (TTS) 初始化
+// 語音
 // =====================
 function loadVoices() {
     return new Promise(resolve => {
@@ -373,7 +367,7 @@ async function initSpeech() {
 }
 
 // =====================
-// 載入後端支援的翻譯語言選單
+// 語言 (還原回你原來的 JSON 動態載入)
 // =====================
 async function initLangs() {
     try {
@@ -389,17 +383,17 @@ async function initLangs() {
             sel.appendChild(opt);
         });
     } catch (err) {
-        console.log("語言選單載入失敗:", err);
+        console.log(err);
     }
 }
 
 // =====================
-// 語音辨識 (STT) 初始化
+// 語音辨識
 // =====================
 function initRecognition() {
     const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!Speech) {
-        alert("目前瀏覽器不支援語音辨識");
+        alert("不支援語音辨識");
         return;
     }
 
@@ -412,14 +406,10 @@ function initRecognition() {
         document.getElementById("original").innerText = text;
         handleTranslation(text);
     };
-    
-    recognition.onerror = () => {
-        document.getElementById("status").innerText = "語音辨識出錯，請再試一次";
-    };
 }
 
 // =====================
-// 啟動麥克風聆聽
+// 麥克風
 // =====================
 function runMic(mode) {
     if (!recognition) {
@@ -432,13 +422,13 @@ function runMic(mode) {
     try {
         recognition.start();
         document.getElementById("status").innerText = "🎤 聆聽中...";
-    } catch(e) {
-        console.log("辨識已在運行中:", e);
+    } catch (e) {
+        console.log(e);
     }
 }
 
 // =====================
-// 處理語音翻譯
+// 翻譯
 // =====================
 async function handleTranslation(text) {
     document.getElementById("status").innerText = "翻譯中...";
@@ -461,14 +451,14 @@ async function handleTranslation(text) {
 
         const playLang = (mode === "me") ? sel.selectedOptions[0].dataset.v : "zh-TW";
         speak(data.translatedText, playLang);
-        document.getElementById("status").innerText = "✅ 完成";
+        document.getElementById("status").innerText = "完成";
     } catch (err) {
         document.getElementById("status").innerText = "翻譯失敗";
     }
 }
 
 // =====================
-// 發音功能
+// 播放
 // =====================
 function speak(text, lang) {
     lastSpeakText = text;
@@ -495,7 +485,7 @@ function replayAudio() {
 }
 
 // =====================
-// OCR 圖片選擇與預覽
+// OCR 圖片選擇
 // =====================
 document.getElementById("pickBtn").addEventListener("click", () => {
     document.getElementById("imageInput").click();
@@ -519,11 +509,11 @@ document.getElementById("imageInput").addEventListener("change", (e) => {
 });
 
 // =====================
-// 核心修正：OCR 掃描辨識
+// OCR 掃描 (精準單語辨識)
 // =====================
 async function scanText() {
     if (!selectedImage) {
-        alert("請先拍照或選擇圖片");
+        alert("請先拍照或選圖片");
         return;
     }
 
@@ -531,29 +521,22 @@ async function scanText() {
     document.getElementById("ocr-result-box").classList.add("loading");
 
     try {
-        // 核心改動：每次精準讀取目前選單指定的單一語言代碼（例如 'chi_tra' 或 'eng'）
+        // 核心修正：抓取新設計的獨立圖片語言選單
         const chosenLang = document.getElementById("ocrImageLang").value;
 
         const result = await Tesseract.recognize(
             selectedImage,
-            chosenLang 
+            chosenLang // 只餵給它目前需要的單一字形庫，辨識率才會高
         );
 
         let text = result.data.text.trim();
-        // 清理過多的換行符號
         text = text.replace(/\n{3,}/g, "\n\n");
 
-        if (!text) {
-            document.getElementById("ocrOriginal").innerText = "(無法辨識出文字，請確認語言選單是否正確，或換個角度重拍)";
-            document.getElementById("status").innerText = "辨識結束（無文字）";
-        } else {
-            document.getElementById("ocrOriginal").innerText = text;
-            // 執行翻譯
-            await handleOCRTranslation(text);
-        }
+        document.getElementById("ocrOriginal").innerText = text;
+        await handleOCRTranslation(text);
 
     } catch (err) {
-        console.error(err);
+        console.log(err);
         document.getElementById("status").innerText = "OCR 失敗";
     }
 
@@ -561,7 +544,7 @@ async function scanText() {
 }
 
 // =====================
-// OCR 文字翻譯
+// OCR 翻譯
 // =====================
 async function handleOCRTranslation(text) {
     const sel = document.getElementById("target");
@@ -573,7 +556,7 @@ async function handleOCRTranslation(text) {
             body: JSON.stringify({
                 text: text,
                 target: sel.value,
-                mode: "other" // 圖片掃描通常視為翻譯外文
+                mode: "other"
             })
         });
 
@@ -582,8 +565,6 @@ async function handleOCRTranslation(text) {
         lastSpeakText = data.translatedText;
 
         document.getElementById("status").innerText = "✅ 完成";
-        
-        // 辨識完成後自動播放中文翻譯
         speak(data.translatedText, "zh-TW");
     } catch (err) {
         document.getElementById("status").innerText = "翻譯失敗";
@@ -591,14 +572,12 @@ async function handleOCRTranslation(text) {
 }
 
 // =====================
-// OCR 相關按鈕事件監聽
+// OCR 按鈕
 // =====================
 document.getElementById("scanBtn").addEventListener("click", scanText);
 
 document.getElementById("ocrSpeakBtn").addEventListener("click", () => {
-    if(lastSpeakText) {
-        speak(lastSpeakText, "zh-TW");
-    }
+    speak(lastSpeakText, "zh-TW");
 });
 
 document.getElementById("stopBtn").addEventListener("click", () => {
@@ -606,7 +585,7 @@ document.getElementById("stopBtn").addEventListener("click", () => {
 });
 
 // =====================
-// 網頁初始化
+// INIT
 // =====================
 initSpeech();
 initLangs();
