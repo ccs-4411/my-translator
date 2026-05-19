@@ -88,8 +88,8 @@ def serve_manifest():
 @app.route("/sw.js")
 def sw():
 
-    return send_from_directory(
-        "static",
+  return send_from_directory(
+        BASE_DIR,
         "sw.js"
     )
 
