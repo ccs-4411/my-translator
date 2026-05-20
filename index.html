@@ -1,158 +1,573 @@
-import os
-import json
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from deep_translator import GoogleTranslator
-from google import genai
-from google.genai import types
-import io
-from PIL import Image, ImageEnhance, ImageFilter
+<!DOCTYPE html>
+<html lang="zh-TW">
 
-app = Flask(__name__, static_folder='static')
-CORS(app)
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 翻譯官</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a73e8">
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f2f4f7;
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
 
-client = genai.Client()
+        .card {
+            max-width: 520px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
 
-def load_languages():
-    lang_path = os.path.join(BASE_DIR, "languages.json")
-    if os.path.exists(lang_path):
-        with open(lang_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+        h2 {
+            color: #1a73e8;
+            margin-top: 0;
+        }
 
-LANGUAGES = load_languages()
+        .top-menu {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
 
-def get_lang_code(name):
-    for lang in LANGUAGES:
-        if lang["name"] == name:
-            return lang["code"]
-    return "en"
+        .top-menu button {
+            flex: 1;
+            border: none;
+            border-radius: 15px;
+            padding: 14px;
+            background: #1a73e8;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-@app.route("/")
-def index():
-    return send_from_directory(BASE_DIR, "index.html")
+        #status {
+            font-size: 0.95rem;
+            color: #1a73e8;
+            margin-bottom: 12px;
+            font-weight: bold;
+            min-height: 1.2em;
+        }
 
-@app.route("/manifest.json")
-def serve_manifest():
-    return send_from_directory(BASE_DIR, "manifest.json")
+        select {
+            width: 100%;
+            padding: 14px;
+            border-radius: 15px;
+            border: 2px solid #eee;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
 
-@app.route("/sw.js")
-def sw():
-    return send_from_directory(BASE_DIR, "sw.js")
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
 
-@app.route("/languages")
-def get_langs():
-    return jsonify(LANGUAGES)
+        .mic-btn {
+            flex: 1;
+            height: 120px;
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
 
-@app.route("/translate", methods=["POST"])
-def translate():
-    try:
-        data = request.get_json()
-        text = data.get("text", "").strip()
-        target_name = data.get("target", "")
-        mode = data.get("mode", "me")
+        #btn-me {
+            background: #1a73e8;
+        }
+
+        #btn-other {
+            background: #34a853;
+        }
+
+        .active {
+            background: #ea4335 !important;
+            transform: scale(0.97);
+        }
+
+        #result-box {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 18px;
+            text-align: left;
+            min-height: 120px;
+        }
+
+        #original {
+            color: #888;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            font-size: 1rem;
+            white-space: pre-wrap;
+        }
+
+        #translated {
+            font-size: 1.6rem;
+            font-weight: bold;
+            margin-top: 12px;
+            color: #111;
+            white-space: pre-wrap;
+        }
+
+        .play-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .play-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 15px;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #replay-btn {
+            background: #ff9800;
+        }
+
+        #ocrPage {
+            display: none;
+        }
+
+        #previewImage {
+            width: 100%;
+            border-radius: 20px;
+            margin-top: 10px;
+            display: none;
+            max-height: 420px;
+            object-fit: contain;
+            background: black;
+        }
+
+        .ocr-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .ocr-buttons button {
+            flex: 1;
+            border: none;
+            border-radius: 15px;
+            padding: 14px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #pickBtn {
+            background: #1a73e8;
+        }
+
+        #scanBtn {
+            background: #34a853;
+        }
+
+        #ocrSpeakBtn {
+            background: #ff9800;
+        }
+
+        #stopBtn {
+            background: #ea4335;
+        }
+
+        #ocr-result-box {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 15px;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        #ocrOriginal {
+            color: #666;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+        }
+
+        #ocrTranslated {
+            margin-top: 12px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            white-space: pre-wrap;
+        }
+
+        .tip {
+            margin-top: 15px;
+            color: #777;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .loading {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card">
+    <h2>AI 翻譯官</h2>
+
+    <div class="top-menu">
+        <button onclick="showVoicePage()">🎤 語音翻譯</button>
+        <button onclick="showOCRPage()">📷 掃描翻譯</button>
+    </div>
+
+    <div id="status">準備就緒</div>
+
+    <!-- 語音翻譯 -->
+    <div id="voicePage">
+        <select id="target"></select>
+
+        <div class="btn-group">
+            <button id="btn-me" class="mic-btn" onclick="runMic('me')">🎤 我講中文</button>
+            <button id="btn-other" class="mic-btn" onclick="runMic('other')">🎧 對方講</button>
+        </div>
+
+        <div id="result-box">
+            <div id="original">等待說話...</div>
+            <div id="translated">翻譯結果</div>
+            <div class="play-group">
+                <button id="replay-btn" class="play-btn" onclick="replayAudio()">🔊 重播</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OCR 掃描翻譯 -->
+    <div id="ocrPage">
+        <input type="file" id="imageInput" accept="image/*" capture="environment" hidden>
+        <img id="previewImage">
+
+        <div class="ocr-buttons">
+            <button id="pickBtn">📷 拍照 / 選圖片</button>
+            <button id="scanBtn">🔍 開始辨識</button>
+        </div>
+
+        <div class="ocr-buttons">
+            <button id="ocrSpeakBtn">🔊 念出翻譯</button>
+            <button id="stopBtn">⛔ 停止</button>
+        </div>
+
+        <div id="ocr-result-box">
+            <div id="ocrOriginal">掃描文字會顯示在這裡</div>
+            <div id="ocrTranslated">翻譯結果</div>
+        </div>
+
+        <div class="tip">
+            <strong>說明：</strong>背後由次世代 AI 視覺模型進行自動多國語言偵測，文字辨識成功後會自動以 Google 翻譯呈現繁體中文。
+        </div>
+    </div>
+</div>
+
+<script>
+// =====================
+// 全域變數
+// =====================
+let recognition = null;
+let VOICES = [];
+let lastSpeakText = "";
+let lastSpeakLang = "zh-TW";
+let selectedImage = null;
+
+// =====================
+// Service Worker
+// =====================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(() => {
+        console.log("SW OK");
+    });
+}
+
+// =====================
+// 頁面切換
+// =====================
+function showVoicePage() {
+    document.getElementById("voicePage").style.display = "block";
+    document.getElementById("ocrPage").style.display = "none";
+}
+
+function showOCRPage() {
+    document.getElementById("voicePage").style.display = "none";
+    document.getElementById("ocrPage").style.display = "block";
+}
+
+// =====================
+// 語音
+// =====================
+function loadVoices() {
+    return new Promise(resolve => {
+        let voices = speechSynthesis.getVoices();
+        if (voices.length) {
+            return resolve(voices);
+        }
+        speechSynthesis.onvoiceschanged = () => {
+            resolve(speechSynthesis.getVoices());
+        };
+    });
+}
+
+async function initSpeech() {
+    VOICES = await loadVoices();
+}
+
+// =====================
+// 語言清單
+// =====================
+async function initLangs() {
+    try {
+        const res = await fetch("/languages");
+        const langs = await res.json();
+        const sel = document.getElementById("target");
+
+        langs.forEach(l => {
+            const opt = document.createElement("option");
+            opt.value = l.name;
+            opt.textContent = `${l.name} ${l.label}`;
+            opt.dataset.v = l.voice;
+            sel.appendChild(opt);
+        });
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// =====================
+// 語音辨識
+// =====================
+function initRecognition() {
+    const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!Speech) {
+        alert("不支援語音辨識");
+        return;
+    }
+
+    recognition = new Speech();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        document.getElementById("original").innerText = text;
+        handleTranslation(text);
+    };
+}
+
+function runMic(mode) {
+    if (!recognition) {
+        initRecognition();
+    }
+
+    const sel = document.getElementById("target");
+    recognition.lang = (mode === "me") ? "zh-TW" : sel.selectedOptions[0].dataset.v;
+
+    try {
+        recognition.start();
+        document.getElementById("status").innerText = "🎤 聆聽中...";
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// =====================
+// 語音翻譯
+// =====================
+async function handleTranslation(text) {
+    document.getElementById("status").innerText = "翻譯中...";
+    const sel = document.getElementById("target");
+    const mode = (recognition.lang === "zh-TW") ? "me" : "other";
+
+    try {
+        const res = await fetch("/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: text,
+                target: sel.value,
+                mode: mode
+            })
+        });
+
+        const data = await res.json();
+        document.getElementById("translated").innerText = data.translatedText;
+
+        const playLang = (mode === "me") ? sel.selectedOptions[0].dataset.v : "zh-TW";
+        speak(data.translatedText, playLang);
+        document.getElementById("status").innerText = "完成";
+    } catch (err) {
+        document.getElementById("status").innerText = "翻譯失敗";
+    }
+}
+
+// =====================
+// 播放
+// =====================
+function speak(text, lang) {
+    lastSpeakText = text;
+    lastSpeakLang = lang;
+
+    speechSynthesis.cancel();
+
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = lang;
+
+    const voice = VOICES.find(v => v.lang.replace('_', '-') === lang) || 
+                  VOICES.find(v => v.lang.startsWith(lang.split('-')[0]));
+
+    if (voice) {
+        msg.voice = voice;
+    }
+
+    speechSynthesis.speak(msg);
+}
+
+function replayAudio() {
+    if (!lastSpeakText) return;
+    speak(lastSpeakText, lastSpeakLang);
+}
+
+// =====================
+// OCR 圖片選擇與預覽
+// =====================
+document.getElementById("pickBtn").addEventListener("click", () => {
+    document.getElementById("imageInput").click();
+});
+
+document.getElementById("imageInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    selectedImage = file;
+    const reader = new FileReader();
+
+    reader.onload = function (ev) {
+        const img = document.getElementById("previewImage");
+        img.src = ev.target.result;
+        img.style.display = "block";
+        document.getElementById("status").innerText = "📷 圖片已載入";
+    };
+
+    reader.readAsDataURL(file);
+});
+
+// =====================
+// OCR 壓縮優化與送出
+// =====================
+async function scanText() {
+    if (!selectedImage) {
+        alert("請先拍照或選取圖片");
+        return;
+    }
+
+    document.getElementById("status").innerText = "🔍 影像優化與 AI 辨識中...";
+    document.getElementById("ocr-result-box").classList.add("loading");
+
+    try {
+        // 【核心優化】：用隱藏 Canvas 將過大的照片合理縮小，避免上傳失真與雜訊
+        const optimizedImageBlob = await new Promise((resolve) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(selectedImage);
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                // 限制最大寬度為 1600 像素，維持高品質並大幅減少傳輸雜訊
+                const MAX_WIDTH = 1600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 轉成高品質的 JPEG
+                canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.90);
+            };
+        });
+
+        // 包裝成 FormData 傳送給後端
+        const formData = new FormData();
+        formData.append("image", optimizedImageBlob, "ocr_capture.jpg");
+
+        const res = await fetch("/ocr_translate", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!res.ok) throw new Error("後端服務連線失敗");
+
+        const data = await res.json();
+
+        // 渲染結果到畫面上
+        document.getElementById("ocrOriginal").innerText = data.ocrOriginal;
+        document.getElementById("ocrTranslated").innerText = data.ocrTranslated;
         
-        if not text:
-            return jsonify({"translatedText": ""})
+        lastSpeakText = data.ocrTranslated;
+        document.getElementById("status").innerText = "✅ 完成";
         
-        target_code = get_lang_code(target_name)
-        
-        if mode == "me":
-            source = "zh-TW"
-            target = target_code
-        else:
-            source = target_code
-            target = "zh-TW"
-        
-        result = GoogleTranslator(source=source, target=target).translate(text)
-        return jsonify({"translatedText": result})
-    except Exception as e:
-        print("翻譯錯誤:", e)
-        return jsonify({"translatedText": "翻譯失敗"}), 500
+        // 自動念出翻譯結果
+        speak(data.ocrTranslated, "zh-TW");
 
-def preprocess_image(image_bytes):
-    try:
-        img = Image.open(io.BytesIO(image_bytes))
-        if img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
-        
-        max_width = 2000
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_size = (max_width, int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.4)
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=2))
-        
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=92, optimize=True)
-        return output.getvalue()
-    except Exception as e:
-        print("預處理異常:", e)
-        return image_bytes
+    } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "AI 辨識失敗，請重新嘗試";
+    }
 
-@app.route("/ocr_translate", methods=["POST"])
-def ocr_translate():
-    try:
-        if 'image' not in request.files:
-            return jsonify({"error": "沒有上傳圖片"}), 400
-        
-        file = request.files['image']
-        raw_bytes = file.read()
-        enhanced_bytes = preprocess_image(raw_bytes)
-        
-        prompt_text = """你是OCR文字辨識系統。請掃描圖片中的所有文字。
+    document.getElementById("ocr-result-box").classList.remove("loading");
+}
 
-規則：
-1. 只輸出原始文字，不要翻譯、不要解釋
-2. 保留標點符號、數字、空格和換行
-3. 支援英文、中文、日文、韓文
-4. 不要使用Markdown或代碼框
+// =====================
+// OCR 按鈕事件
+// =====================
+document.getElementById("scanBtn").addEventListener("click", scanText);
 
-請輸出圖片中的文字："""
-        
-        response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
-            contents=[
-                types.Part.from_bytes(data=enhanced_bytes, mime_type="image/jpeg"),
-                prompt_text
-            ]
-        )
-        
-        ocr_text = response.text.strip() if response.text else ""
-        
-        if not ocr_text or len(ocr_text) < 2:
-            ocr_text = "無法辨識文字"
-        
-        try:
-            translated = GoogleTranslator(source='auto', target='zh-TW').translate(ocr_text)
-        except Exception as trans_err:
-            print("翻譯錯誤:", trans_err)
-            translated = "翻譯服務異常"
-        
-        return jsonify({
-            "ocrOriginal": ocr_text,
-            "ocrTranslated": translated
-        })
-        
-    except Exception as e:
-        print("OCR 錯誤:", e)
-        return jsonify({
-            "ocrOriginal": f"辨識失敗",
-            "ocrTranslated": "請重新拍攝"
-        }), 500
+document.getElementById("ocrSpeakBtn").addEventListener("click", () => {
+    speak(lastSpeakText, "zh-TW");
+});
 
-@app.route('/health')
-def health():
-    return "OK", 200
+document.getElementById("stopBtn").addEventListener("click", () => {
+    speechSynthesis.cancel();
+});
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+// =====================
+// 初始化
+// =====================
+initSpeech();
+initLangs();
+</script>
+
+</body>
+</html>
 
 
 
