@@ -1,38 +1,65 @@
+# app.py
 import os
 import json
-from flask import Flask, request, jsonify, send_from_directory
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    send_from_directory
+)
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
+
+# 引入 Google 官方 GenAI 套件
 from google import genai
 from google.genai import types
-import io
-from PIL import Image, ImageEnhance, ImageFilter
 
-app = Flask(__name__, static_folder='static')
+app = Flask(
+    __name__,
+    static_folder='static'
+)
+
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
-# 初始化 Gemini
+# 初始化 Gemini 客戶端 (自動讀取系統環境變數 GEMINI_API_KEY)
+# 請至 Google AI Studio 免費申請 API Key
 client = genai.Client()
 
-# ================== 載入語言清單 ==================
+# =========================
+# 載入語言清單
+# =========================
 def load_languages():
-    lang_path = os.path.join(BASE_DIR, "languages.json")
+    lang_path = os.path.join(
+        BASE_DIR,
+        "languages.json"
+    )
     if os.path.exists(lang_path):
-        with open(lang_path, "r", encoding="utf-8") as f:
+        with open(
+            lang_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
             return json.load(f)
     return []
 
 LANGUAGES = load_languages()
 
+# =========================
+# 取得語言代碼
+# =========================
 def get_lang_code(name):
     for lang in LANGUAGES:
         if lang["name"] == name:
             return lang["code"]
     return "en"
 
-# ================== 靜態路由 ==================
+# =========================
+# 靜態檔案路徑路由
+# =========================
 @app.route("/")
 def index():
     return send_from_directory(BASE_DIR, "index.html")
@@ -49,7 +76,9 @@ def sw():
 def get_langs():
     return jsonify(LANGUAGES)
 
-# ================== 語音翻譯 ==================
+# =========================
+# 語音/文字對談翻譯 API (維持 Google 翻譯)
+# =========================
 @app.route("/translate", methods=["POST"])
 def translate():
     try:
@@ -57,118 +86,108 @@ def translate():
         text = data.get("text", "").strip()
         target_name = data.get("target", "")
         mode = data.get("mode", "me")
-        
+
         if not text:
             return jsonify({"translatedText": ""})
-        
+
         target_code = get_lang_code(target_name)
-        
+
         if mode == "me":
             source = "zh-TW"
             target = target_code
         else:
             source = target_code
             target = "zh-TW"
-        
-        result = GoogleTranslator(source=source, target=target).translate(text)
-        return jsonify({"translatedText": result})
-    except Exception as e:
-        print("翻譯錯誤:", e)
-        return jsonify({"translatedText": "翻譯失敗"}), 500
 
-# ================== 圖片預處理 ==================
-def preprocess_image(image_bytes):
-    """圖片預處理：增強對比、銳利化"""
-    try:
-        img = Image.open(io.BytesIO(image_bytes))
-        if img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
-        
-        # 限制最大寬度
-        max_width = 2000
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_size = (max_width, int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # 對比度增強
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.4)
-        
-        # 銳利化
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=2))
-        
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=92, optimize=True)
-        return output.getvalue()
-    except Exception as e:
-        print("預處理異常:", e)
-        return image_bytes
+        result = GoogleTranslator(
+            source=source,
+            target=target
+        ).translate(text)
 
-# ================== OCR 辨識 + 翻譯 ==================
+        return jsonify({
+            "translatedText": result
+        })
+
+    except Exception as e:
+        print("語音/文字翻譯錯誤:", e)
+        return jsonify({
+            "translatedText": "翻譯失敗"
+        }), 500
+
+# =========================
+# 拍照辨識 API (強效防呆職責分離版)
+# =========================
 @app.route("/ocr_translate", methods=["POST"])
 def ocr_translate():
     try:
         if 'image' not in request.files:
             return jsonify({"error": "沒有上傳圖片"}), 400
-        
+            
         file = request.files['image']
-        raw_bytes = file.read()
+        image_bytes = file.read()
         
-        # 圖片預處理
-        enhanced_bytes = preprocess_image(raw_bytes)
-        
-        # Gemini OCR 提示詞 - 專注精準辨識
-        prompt_text = """你是專業的OCR文字辨識系統。請仔細掃描這張圖片中的所有文字。
+        # 1. 第一步：強硬的 OCR 提示詞，逼 AI 一字不漏地把英/日/中文摳出來
+        prompt = (
+            "你是一個專業的網頁與文件 OCR 辨識系統。請仔細掃描這張圖片，"
+            "將圖片中看到的『所有文字』一字不漏地擷取出來。\n"
+            "嚴格遵守以下規則：\n"
+            "1. 必須完整保留圖片中的所有英文單字、數字、標點符號與原本的段落換行。\n"
+            "2. 即使是網頁代碼、排版按鈕或角落小字，只要是人類看得懂的字就必須抓出來。\n"
+            "3. 絕對不要進行任何翻譯、解釋、潤飾或歸納，只需要原汁原味輸出辨識出的原本文字。\n"
+            "4. 不要添加額外的說明（例如不需寫 Here is the text:），也不要用 ``` 等 Markdown 語法包裹輸出。"
+        )
 
-嚴格遵守以下規則：
-1. 只輸出圖片中的原始文字，不要翻譯、不要解釋、不要加任何註釋
-2. 保留標點符號、數字、空格和原始換行結構
-3. 特別注意辨識：
-   - 英文單字和數字（尤其是藥品名稱、劑量）
-   - 中文繁體/簡體字
-   - 日文、韓文等
-4. 如果文字有反光或稍微模糊，請根據形狀盡可能正確辨識
-5. 不要使用Markdown、不要用代碼框、不要添加任何額外說明
-
-請直接輸出圖片中的文字："""
-        
         response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
+            model='gemini-2.5-flash',
             contents=[
-                types.Part.from_bytes(data=enhanced_bytes, mime_type="image/jpeg"),
-                prompt_text
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=file.content_type
+                ),
+                prompt,
             ]
         )
-        
+
         ocr_text = response.text.strip() if response.text else ""
         
-        if not ocr_text or len(ocr_text) < 2:
-            ocr_text = "無法辨識文字，請確認圖片光線充足、文字清晰"
-        
-        # 使用 Google 翻譯成繁體中文
+        if not ocr_text:
+            return jsonify({
+                "ocrOriginal": "無法辨識圖片中的文字",
+                "ocrTranslated": "請重新拍攝清楚的圖片"
+            })
+
+        # 2. 第二步：交給最擅長長文本的 Google 翻譯轉成繁體中文
         try:
-            translated = GoogleTranslator(source='auto', target='zh-TW').translate(ocr_text)
+            translated_text = GoogleTranslator(
+                source="auto",
+                target="zh-TW"
+            ).translate(ocr_text)
         except Exception as trans_err:
-            print("翻譯錯誤:", trans_err)
-            translated = "翻譯服務暫時異常"
-        
+            print("OCR 翻譯階段失敗:", trans_err)
+            translated_text = "文字辨識成功，但翻譯時發生錯誤。"
+
         return jsonify({
             "ocrOriginal": ocr_text,
-            "ocrTranslated": translated
+            "ocrTranslated": translated_text
         })
-        
+
     except Exception as e:
-        print("OCR 錯誤:", e)
+        print("OCR 核心流程錯誤:", e)
         return jsonify({
-            "ocrOriginal": f"辨識失敗: {str(e)}",
-            "ocrTranslated": "請重新拍攝，確保光線充足、文字清晰"
+            "ocrOriginal": "辨識失敗",
+            "ocrTranslated": "後端視覺辨識暫時無法回應"
         }), 500
 
+# =========================
+# Health Check
+# =========================
 @app.route('/health')
 def health():
     return "OK", 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
