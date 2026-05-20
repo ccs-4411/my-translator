@@ -12,9 +12,13 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 初始化 Gemini (正確寫法)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-2.5-flash')
+# 初始化 Gemini - 支援兩種環境變數名稱
+api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+if not api_key:
+    print("警告: 未設定 GEMINI_API_KEY 或 GOOGLE_API_KEY")
+else:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
 def load_languages():
     lang_path = os.path.join(BASE_DIR, "languages.json")
@@ -115,6 +119,13 @@ def ocr_translate():
 4. 不要使用Markdown或代碼框
 
 請輸出圖片中的文字："""
+        
+        # 檢查 model 是否已初始化
+        if 'model' not in globals():
+            return jsonify({
+                "ocrOriginal": "API 金鑰未設定",
+                "ocrTranslated": "請設定 GEMINI_API_KEY 環境變數"
+            }), 500
         
         response = model.generate_content([
             {"mime_type": "image/jpeg", "data": enhanced_bytes},
