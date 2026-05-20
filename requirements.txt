@@ -1,6 +1,4 @@
 Flask
 flask-cors
 deep-translator
-google-generativeai
-python-dotenv
 gunicorn
