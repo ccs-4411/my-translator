@@ -5,8 +5,6 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 import google.generativeai as genai
-from dotenv import load_dotenv
-load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
