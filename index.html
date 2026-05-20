@@ -7,7 +7,6 @@
     <title>AI 翻譯官</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a73e8">
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
         body {
@@ -65,19 +64,6 @@
             font-size: 1rem;
             margin-bottom: 10px;
             box-sizing: border-box;
-        }
-
-        .select-group {
-            text-align: left;
-            margin-bottom: 10px;
-        }
-        .select-group label {
-            font-size: 0.85rem;
-            color: #555;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-            padding-left: 5px;
         }
 
         .btn-group {
@@ -169,10 +155,6 @@
             background: black;
         }
 
-        canvas {
-            display: none;
-        }
-
         .ocr-buttons {
             display: flex;
             gap: 10px;
@@ -240,7 +222,7 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
+            0’% { opacity: 1; }
             50% { opacity: 0.4; }
             100% { opacity: 1; }
         }
@@ -259,9 +241,9 @@
 
     <div id="status">準備就緒</div>
 
-    <!-- 語音翻譯 -->
+    <!-- 語音翻譯頁面 -->
     <div id="voicePage">
-        <!-- 保持原狀：由原來的 json 動態載入 -->
+        <!-- 由後端 json 動態載入語言清單 -->
         <select id="target"></select>
 
         <div class="btn-group">
@@ -278,19 +260,8 @@
         </div>
     </div>
 
-    <!-- OCR 掃描翻譯 -->
+    <!-- 📷 OCR 掃描翻譯頁面 (後端 AI 自動識別語言，故取消前端語言選單) -->
     <div id="ocrPage">
-        <!-- 新增的獨立圖片語言選單，確保 Tesseract.js 不會混亂 -->
-        <div class="select-group">
-            <label>請選擇圖片中的文字語言：</label>
-            <select id="ocrImageLang">
-                <option value="eng">英文 (English)</option>
-                <option value="chi_tra" selected>繁體中文 (Traditional Chinese)</option>
-                <option value="jpn">日文 (Japanese)</option>
-                <option value="kor">韓文 (Korean)</option>
-            </select>
-        </div>
-
         <input type="file" id="imageInput" accept="image/*" capture="environment" hidden>
         <img id="previewImage">
 
@@ -310,7 +281,7 @@
         </div>
 
         <div class="tip">
-            <strong>建議：</strong>拍近一點、保持穩定、精準選擇圖片文字語言效果最好。
+            <strong>說明：</strong>背後由次世代 AI 模型進行視覺分析，您無需手動切換日文、英文或韓文，系統會自動辨識並精準翻譯。
         </div>
     </div>
 </div>
@@ -326,7 +297,7 @@ let lastSpeakLang = "zh-TW";
 let selectedImage = null;
 
 // =====================
-// Service Worker
+// Service Worker 註冊
 // =====================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').then(() => {
@@ -348,7 +319,7 @@ function showOCRPage() {
 }
 
 // =====================
-// 語音
+// 語音合成系統 (TTS)
 // =====================
 function loadVoices() {
     return new Promise(resolve => {
@@ -367,7 +338,7 @@ async function initSpeech() {
 }
 
 // =====================
-// 語言 (還原回你原來的 JSON 動態載入)
+// 載入後端 JSON 語言列表 (用於語音翻譯)
 // =====================
 async function initLangs() {
     try {
@@ -383,17 +354,17 @@ async function initLangs() {
             sel.appendChild(opt);
         });
     } catch (err) {
-        console.log(err);
+        console.error("語言選單載入失敗:", err);
     }
 }
 
 // =====================
-// 語音辨識
+// 網頁語音辨識 (STT)
 // =====================
 function initRecognition() {
     const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!Speech) {
-        alert("不支援語音辨識");
+        alert("目前瀏覽器不支援 Web Speech API 語音辨識功能");
         return;
     }
 
@@ -408,9 +379,6 @@ function initRecognition() {
     };
 }
 
-// =====================
-// 麥克風
-// =====================
 function runMic(mode) {
     if (!recognition) {
         initRecognition();
@@ -423,12 +391,12 @@ function runMic(mode) {
         recognition.start();
         document.getElementById("status").innerText = "🎤 聆聽中...";
     } catch (e) {
-        console.log(e);
+        console.error(e);
     }
 }
 
 // =====================
-// 翻譯
+// 語音翻譯處理
 // =====================
 async function handleTranslation(text) {
     document.getElementById("status").innerText = "翻譯中...";
@@ -458,7 +426,7 @@ async function handleTranslation(text) {
 }
 
 // =====================
-// 播放
+// 發音播報功能
 // =====================
 function speak(text, lang) {
     lastSpeakText = text;
@@ -485,7 +453,7 @@ function replayAudio() {
 }
 
 // =====================
-// OCR 圖片選擇
+// OCR 檔案選擇管理
 // =====================
 document.getElementById("pickBtn").addEventListener("click", () => {
     document.getElementById("imageInput").click();
@@ -509,70 +477,52 @@ document.getElementById("imageInput").addEventListener("change", (e) => {
 });
 
 // =====================
-// OCR 掃描 (精準單語辨識)
+// OCR 掃描與翻譯 (將圖片用 FormData 直接送回後端 Gemini 2.5 Flash 處理)
 // =====================
 async function scanText() {
     if (!selectedImage) {
-        alert("請先拍照或選圖片");
+        alert("請先拍照或選取圖片");
         return;
     }
 
-    document.getElementById("status").innerText = "🔍 OCR 辨識中...";
+    document.getElementById("status").innerText = "🔍 AI 高速辨識與翻譯中...";
     document.getElementById("ocr-result-box").classList.add("loading");
 
     try {
-        // 核心修正：抓取新設計的獨立圖片語言選單
-        const chosenLang = document.getElementById("ocrImageLang").value;
+        // 使用真實二進位表單打包圖片上傳
+        const formData = new FormData();
+        formData.append("image", selectedImage);
 
-        const result = await Tesseract.recognize(
-            selectedImage,
-            chosenLang // 只餵給它目前需要的單一字形庫，辨識率才會高
-        );
+        // 呼叫 Flask 後端全新的 /ocr_translate 路由
+        const res = await fetch("/ocr_translate", {
+            method: "POST",
+            body: formData
+        });
 
-        let text = result.data.text.trim();
-        text = text.replace(/\n{3,}/g, "\n\n");
+        if (!res.ok) throw new Error("後端 API 回應錯誤");
 
-        document.getElementById("ocrOriginal").innerText = text;
-        await handleOCRTranslation(text);
+        const data = await res.json();
+
+        // 渲染後端高準確度回傳的文字
+        document.getElementById("ocrOriginal").innerText = data.ocrOriginal;
+        document.getElementById("ocrTranslated").innerText = data.ocrTranslated;
+        
+        lastSpeakText = data.ocrTranslated;
+        document.getElementById("status").innerText = "✅ 完成";
+        
+        // 辨識翻譯完後，自動語音朗讀中文結果
+        speak(data.ocrTranslated, "zh-TW");
 
     } catch (err) {
-        console.log(err);
-        document.getElementById("status").innerText = "OCR 失敗";
+        console.error(err);
+        document.getElementById("status").innerText = "AI 辨識失敗";
     }
 
     document.getElementById("ocr-result-box").classList.remove("loading");
 }
 
 // =====================
-// OCR 翻譯
-// =====================
-async function handleOCRTranslation(text) {
-    const sel = document.getElementById("target");
-
-    try {
-        const res = await fetch("/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                text: text,
-                target: sel.value,
-                mode: "other"
-            })
-        });
-
-        const data = await res.json();
-        document.getElementById("ocrTranslated").innerText = data.translatedText;
-        lastSpeakText = data.translatedText;
-
-        document.getElementById("status").innerText = "✅ 完成";
-        speak(data.translatedText, "zh-TW");
-    } catch (err) {
-        document.getElementById("status").innerText = "翻譯失敗";
-    }
-}
-
-// =====================
-// OCR 按鈕
+// OCR 按鈕事件綁定
 // =====================
 document.getElementById("scanBtn").addEventListener("click", scanText);
 
@@ -585,7 +535,7 @@ document.getElementById("stopBtn").addEventListener("click", () => {
 });
 
 // =====================
-// INIT
+// 系統初期化啟動
 // =====================
 initSpeech();
 initLangs();
