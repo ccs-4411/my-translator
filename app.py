@@ -3,8 +3,7 @@ import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
-from google import genai
-from google.genai import types
+import google.generativeai as genai  # ← 修正這裡
 import io
 from PIL import Image, ImageEnhance, ImageFilter
 
@@ -13,8 +12,9 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 初始化 Gemini
-client = genai.Client()
+# 初始化 Gemini (修正後的寫法)
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+client = genai.GenerativeModel('gemini-2.0-flash-exp')  # ← 修正這裡
 
 # ================== 載入語言清單 ==================
 def load_languages():
@@ -78,24 +78,19 @@ def translate():
 
 # ================== 圖片預處理 ==================
 def preprocess_image(image_bytes):
-    """圖片預處理：增強對比、銳利化"""
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ('RGBA', 'LA', 'P'):
             img = img.convert('RGB')
         
-        # 限制最大寬度
         max_width = 2000
         if img.width > max_width:
             ratio = max_width / img.width
             new_size = (max_width, int(img.height * ratio))
             img = img.resize(new_size, Image.Resampling.LANCZOS)
         
-        # 對比度增強
         enhancer = ImageEnhance.Contrast(img)
         img = enhancer.enhance(1.4)
-        
-        # 銳利化
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=2))
         
         output = io.BytesIO()
@@ -114,29 +109,25 @@ def ocr_translate():
         
         file = request.files['image']
         raw_bytes = file.read()
-        
-        # 圖片預處理
         enhanced_bytes = preprocess_image(raw_bytes)
         
-        # Gemini OCR 提示詞 - 專注精準辨識
-        prompt_text = """你是專業的OCR文字辨識系統。請仔細掃描這張圖片中的所有文字。
+        prompt_text = """你是OCR文字辨識系統。請掃描圖片中的所有文字。
 
-嚴格遵守以下規則：
-1. 只輸出圖片中的原始文字，不要翻譯、不要解釋、不要加任何註釋
-2. 保留標點符號、數字、空格和原始換行結構
-3. 特別注意辨識：
-   - 英文單字和數字（尤其是藥品名稱、劑量）
-   - 中文繁體/簡體字
-   - 日文、韓文等
-4. 如果文字有反光或稍微模糊，請根據形狀盡可能正確辨識
-5. 不要使用Markdown、不要用代碼框、不要添加任何額外說明
+規則：
+1. 只輸出原始文字，不要翻譯、不要解釋
+2. 保留標點符號、數字、空格和換行
+3. 支援英文、中文、日文、韓文
+4. 不要使用Markdown或代碼框
 
-請直接輸出圖片中的文字："""
+請輸出圖片中的文字："""
         
-        response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
+        # 修正後的 Gemini 調用方式
+        response = client.generate_content(
             contents=[
-                types.Part.from_bytes(data=enhanced_bytes, mime_type="image/jpeg"),
+                {
+                    "mime_type": "image/jpeg",
+                    "data": enhanced_bytes
+                },
                 prompt_text
             ]
         )
@@ -144,14 +135,13 @@ def ocr_translate():
         ocr_text = response.text.strip() if response.text else ""
         
         if not ocr_text or len(ocr_text) < 2:
-            ocr_text = "無法辨識文字，請確認圖片光線充足、文字清晰"
+            ocr_text = "無法辨識文字"
         
-        # 使用 Google 翻譯成繁體中文
         try:
             translated = GoogleTranslator(source='auto', target='zh-TW').translate(ocr_text)
         except Exception as trans_err:
             print("翻譯錯誤:", trans_err)
-            translated = "翻譯服務暫時異常"
+            translated = "翻譯服務異常"
         
         return jsonify({
             "ocrOriginal": ocr_text,
@@ -161,8 +151,8 @@ def ocr_translate():
     except Exception as e:
         print("OCR 錯誤:", e)
         return jsonify({
-            "ocrOriginal": f"辨識失敗: {str(e)}",
-            "ocrTranslated": "請重新拍攝，確保光線充足、文字清晰"
+            "ocrOriginal": f"辨識失敗",
+            "ocrTranslated": "請重新拍攝"
         }), 500
 
 @app.route('/health')
@@ -171,4 +161,4 @@ def health():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
