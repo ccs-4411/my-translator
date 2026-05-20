@@ -3,22 +3,11 @@ import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
-import google.generativeai as genai
-import io
-from PIL import Image, ImageEnhance, ImageFilter
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 初始化 Gemini - 支援兩種環境變數名稱
-api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-if not api_key:
-    print("警告: 未設定 GEMINI_API_KEY 或 GOOGLE_API_KEY")
-else:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
 
 def load_languages():
     lang_path = os.path.join(BASE_DIR, "languages.json")
@@ -51,6 +40,7 @@ def sw():
 def get_langs():
     return jsonify(LANGUAGES)
 
+# 語音翻譯
 @app.route("/translate", methods=["POST"])
 def translate():
     try:
@@ -77,83 +67,21 @@ def translate():
         print("翻譯錯誤:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
-def preprocess_image(image_bytes):
+# OCR 文字翻譯 (將 Tesseract 辨識出的文字翻譯成繁體中文)
+@app.route("/translate_ocr", methods=["POST"])
+def translate_ocr():
     try:
-        img = Image.open(io.BytesIO(image_bytes))
-        if img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
+        data = request.get_json()
+        text = data.get("text", "").strip()
         
-        max_width = 2000
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_size = (max_width, int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        if not text:
+            return jsonify({"translatedText": ""})
         
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.4)
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=2))
-        
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=92, optimize=True)
-        return output.getvalue()
+        result = GoogleTranslator(source='auto', target='zh-TW').translate(text)
+        return jsonify({"translatedText": result})
     except Exception as e:
-        print("預處理異常:", e)
-        return image_bytes
-
-@app.route("/ocr_translate", methods=["POST"])
-def ocr_translate():
-    try:
-        if 'image' not in request.files:
-            return jsonify({"error": "沒有上傳圖片"}), 400
-        
-        file = request.files['image']
-        raw_bytes = file.read()
-        enhanced_bytes = preprocess_image(raw_bytes)
-        
-        prompt_text = """你是OCR文字辨識系統。請掃描圖片中的所有文字。
-
-規則：
-1. 只輸出原始文字，不要翻譯、不要解釋
-2. 保留標點符號、數字、空格和換行
-3. 支援英文、中文、日文、韓文
-4. 不要使用Markdown或代碼框
-
-請輸出圖片中的文字："""
-        
-        # 檢查 model 是否已初始化
-        if 'model' not in globals():
-            return jsonify({
-                "ocrOriginal": "API 金鑰未設定",
-                "ocrTranslated": "請設定 GEMINI_API_KEY 環境變數"
-            }), 500
-        
-        response = model.generate_content([
-            {"mime_type": "image/jpeg", "data": enhanced_bytes},
-            prompt_text
-        ])
-        
-        ocr_text = response.text.strip() if response.text else ""
-        
-        if not ocr_text or len(ocr_text) < 2:
-            ocr_text = "無法辨識文字"
-        
-        try:
-            translated = GoogleTranslator(source='auto', target='zh-TW').translate(ocr_text)
-        except Exception as trans_err:
-            print("翻譯錯誤:", trans_err)
-            translated = "翻譯服務異常"
-        
-        return jsonify({
-            "ocrOriginal": ocr_text,
-            "ocrTranslated": translated
-        })
-        
-    except Exception as e:
-        print("OCR 錯誤:", e)
-        return jsonify({
-            "ocrOriginal": f"辨識失敗: {str(e)}",
-            "ocrTranslated": "請重新拍攝"
-        }), 500
+        print("OCR翻譯錯誤:", e)
+        return jsonify({"translatedText": "翻譯失敗"}), 500
 
 @app.route('/health')
 def health():
