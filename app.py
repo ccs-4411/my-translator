@@ -5,6 +5,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 import google.generativeai as genai
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -15,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
-    # 使用 gemini-1.5-flash，反應速度最適合行動端應用
+    # 使用 gemini-2.5-flash，反應速度最適合行動端應用
     model = genai.GenerativeModel('gemini-2.5-flash')  
     print("Gemini API 初始化成功")
 else:
