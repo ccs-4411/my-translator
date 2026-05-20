@@ -1,4 +1,5 @@
 Flask
 flask-cors
 deep-translator
+gTTS
 gunicorn
