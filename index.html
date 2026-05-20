@@ -4,10 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>AI 翻譯官 - Tesseract OCR</title>
+    <title>AI 翻譯官 - 藥品文字強化OCR</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a73e8">
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -85,11 +84,6 @@
             outline: none;
         }
 
-        select:focus {
-            border-color: #1a73e8;
-            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
-        }
-
         .btn-group {
             display: flex;
             gap: 14px;
@@ -138,13 +132,14 @@
             white-space: pre-wrap;
             word-break: break-word;
             line-height: 1.4;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
+            font-family: 'Courier New', monospace;
         }
 
         #translated,
         #ocrTranslated {
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             font-weight: 700;
             margin-top: 12px;
             color: #202124;
@@ -218,24 +213,26 @@
             background: #d93025;
         }
 
-        /* 語言選擇器 */
-        .ocr-lang-select {
+        .mode-selector {
+            display: flex;
+            gap: 10px;
             margin: 10px 0;
-            text-align: left;
         }
 
-        .ocr-lang-select label {
-            font-size: 0.85rem;
-            color: #5f6368;
-            margin-right: 10px;
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #dadce0;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
         }
 
-        .ocr-lang-select select {
-            width: auto;
-            display: inline-block;
-            padding: 8px 12px;
-            margin-bottom: 0;
-            font-size: 0.85rem;
+        .mode-btn.active {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
         }
 
         .progress-bar {
@@ -263,6 +260,11 @@
             font-size: 0.75rem;
             color: #174ea6;
             text-align: center;
+        }
+
+        .warning {
+            background: #fce8e6;
+            color: #c5221f;
         }
 
         .loading-pulse {
@@ -306,27 +308,19 @@
             </div>
         </div>
 
-        <!-- OCR 掃描區塊 - 使用 Tesseract.js -->
+        <!-- OCR 掃描區塊 - 藥品文字強化版 -->
         <div id="ocrPage">
             <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
             <img id="previewImage" alt="預覽圖片">
             
-            <div class="ocr-lang-select">
-                <label>🔤 辨識語言：</label>
-                <select id="ocrLang">
-                    <option value="eng">英文 (English)</option>
-                    <option value="chi_tra">繁體中文</option>
-                    <option value="chi_sim">簡體中文</option>
-                    <option value="jpn">日文</option>
-                    <option value="kor">韓文</option>
-                    <option value="eng+chi_tra">英文+繁體中文</option>
-                    <option value="eng+jpn">英文+日文</option>
-                </select>
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="medicine">💊 藥品模式</button>
+                <button class="mode-btn" data-mode="document">📄 一般文件</button>
             </div>
 
             <div class="ocr-buttons">
                 <button id="pickBtn">📷 拍照 / 選照片</button>
-                <button id="scanBtn">🔍 Tesseract OCR 辨識</button>
+                <button id="scanBtn">🔍 AI 強化辨識</button>
             </div>
             <div class="progress-bar" id="progressBar">
                 <div class="progress-fill" id="progressFill"></div>
@@ -336,12 +330,12 @@
                 <button id="stopBtn">⛔ 停止朗讀</button>
             </div>
             <div id="ocr-result-box">
-                <div id="ocrOriginal">📖 等待掃描圖片...</div>
+                <div id="ocrOriginal">📖 等待掃描藥品或文件...</div>
                 <div id="ocrTranslated">✨ 翻譯結果</div>
             </div>
             <div class="tip">
-                💡 <strong>Tesseract OCR 引擎</strong>：專業光學字元辨識，對英文、數字、印刷體辨識率極高！<br>
-                📌 建議：圖片越清晰、對比度越高，辨識效果越好。
+                💡 <strong>藥品模式</strong>：專為藥包、藥盒印刷體優化，可辨識藥名、劑量、用法<br>
+                📌 建議：請在光線充足處拍攝，保持文字清晰、盡量平貼無反光
             </div>
         </div>
     </div>
@@ -353,12 +347,25 @@
         let lastSpeakText = "";
         let lastSpeakLang = "zh-TW";
         let selectedImageFile = null;
-        let currentImageUrl = null;
+        let currentMode = "medicine"; // medicine 或 document
 
         // ========== Service Worker ==========
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').catch(e => console.warn("SW註冊失敗", e));
         }
+
+        // ========== 模式切換 ==========
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                const tipText = currentMode === 'medicine' 
+                    ? '💊 藥品模式：專為藥包、藥盒印刷體優化，可辨識藥名、劑量、用法'
+                    : '📄 一般文件模式：適用於標準文件、書籍、印刷品';
+                document.querySelector('.tip').innerHTML = `💡 <strong>${currentMode === 'medicine' ? '藥品模式' : '一般文件模式'}</strong>：${tipText}<br>📌 建議：請在光線充足處拍攝，保持文字清晰、盡量平貼無反光`;
+            });
+        });
 
         // ========== 頁面切換 ==========
         function showVoicePage() {
@@ -370,7 +377,7 @@
         function showOCRPage() {
             document.getElementById("voicePage").style.display = "none";
             document.getElementById("ocrPage").style.display = "block";
-            document.getElementById("status").innerText = "📸 掃描模式 (Tesseract OCR)";
+            document.getElementById("status").innerText = "📸 掃描模式 (AI 強化辨識)";
         }
 
         // ========== 語音合成初始化 ==========
@@ -468,9 +475,9 @@
             }
         }
 
-        // ========== 語音翻譯 (Google 翻譯) ==========
+        // ========== 語音翻譯 ==========
         async function handleTranslation(text) {
-            document.getElementById("status").innerText = "🔄 Google 翻譯中 ...";
+            document.getElementById("status").innerText = "🔄 翻譯中 ...";
             const sel = document.getElementById("target");
             const targetName = sel.value;
             let mode = "me";
@@ -512,7 +519,7 @@
             if (lastSpeakText) speak(lastSpeakText, lastSpeakLang);
         }
 
-        // ========== 圖片預處理 (增強對比度) ==========
+        // ========== 圖片預處理 (強化對比、去反光效果) ==========
         async function preprocessImage(file) {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -532,34 +539,46 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // 增強對比度讓文字更清晰
+                    // 增強對比度和亮度，讓藥品文字更清晰
                     const imageData = ctx.getImageData(0, 0, width, height);
                     const data = imageData.data;
+                    
+                    // 統計亮度分佈，做自適應對比增強
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+                        sum += brightness;
+                    }
+                    const avgBrightness = sum / (data.length / 4);
+                    const contrast = avgBrightness > 128 ? 1.3 : 1.5; // 暗圖用更強對比
+                    
                     for (let i = 0; i < data.length; i += 4) {
                         let r = data[i];
-                        let g = data[i + 1];
-                        let b = data[i + 2];
+                        let g = data[i+1];
+                        let b = data[i+2];
+                        
                         // 對比度增強
-                        const contrast = 1.2;
                         r = Math.min(255, Math.max(0, (r - 128) * contrast + 128));
                         g = Math.min(255, Math.max(0, (g - 128) * contrast + 128));
                         b = Math.min(255, Math.max(0, (b - 128) * contrast + 128));
+                        
+                        // 銳化邊緣
                         data[i] = r;
-                        data[i + 1] = g;
-                        data[i + 2] = b;
+                        data[i+1] = g;
+                        data[i+2] = b;
                     }
                     ctx.putImageData(imageData, 0, 0);
                     
                     canvas.toBlob(blob => {
                         URL.revokeObjectURL(url);
                         resolve(blob);
-                    }, "image/jpeg", 0.9);
+                    }, "image/jpeg", 0.95);
                 };
                 img.src = url;
             });
         }
 
-        // ========== Tesseract OCR 辨識 ==========
+        // ========== 執行 OCR (透過後端 Gemini 強化版) ==========
         async function performOCR() {
             if (!selectedImageFile) {
                 alert("請先拍照或選取圖片");
@@ -573,75 +592,59 @@
             
             statusDiv.innerText = "🔍 圖片預處理中...";
             ocrBox.classList.add("loading-pulse");
+            progressBar.style.display = "block";
+            progressFill.style.width = "30%";
             
             try {
                 // 預處理圖片
+                progressFill.style.width = "50%";
                 const processedBlob = await preprocessImage(selectedImageFile);
-                const imageUrl = URL.createObjectURL(processedBlob);
-                const img = new Image();
-                img.src = imageUrl;
                 
-                await new Promise((resolve) => { img.onload = resolve; });
+                // 上傳到後端進行 Gemini OCR
+                progressFill.style.width = "70%";
+                statusDiv.innerText = "🤖 AI 辨識文字中...";
                 
-                const ocrLang = document.getElementById("ocrLang").value;
-                statusDiv.innerText = `🔍 Tesseract OCR 辨識中 (${ocrLang})...`;
-                progressBar.style.display = "block";
+                const formData = new FormData();
+                formData.append("image", processedBlob, "ocr_image.jpg");
+                formData.append("mode", currentMode);
                 
-                // 使用 Tesseract.js 進行 OCR
-                const worker = await Tesseract.createWorker();
-                await worker.loadLanguage(ocrLang);
-                await worker.initialize(ocrLang);
-                
-                // 設定進度回調
-                worker.setProgress((p) => {
-                    const percent = Math.round(p.progress * 100);
-                    progressFill.style.width = `${percent}%`;
-                    statusDiv.innerText = `🔍 OCR 辨識中... ${percent}%`;
+                const response = await fetch("/ocr_gemini", {
+                    method: "POST",
+                    body: formData
                 });
                 
-                const { data: { text } } = await worker.recognize(img);
-                await worker.terminate();
+                progressFill.style.width = "90%";
                 
-                URL.revokeObjectURL(imageUrl);
-                progressBar.style.display = "none";
-                progressFill.style.width = "0%";
+                if (!response.ok) throw new Error(`服務異常 ${response.status}`);
                 
-                let ocrText = text.trim();
+                const data = await response.json();
+                
+                progressFill.style.width = "100%";
+                
+                let ocrText = data.ocrText || "";
                 if (!ocrText || ocrText.length < 2) {
-                    ocrText = "無法辨識文字，請確保圖片清晰、光線充足，並選擇正確的語言。";
+                    ocrText = "無法辨識文字，請確保：\n1. 光線充足\n2. 文字清晰\n3. 盡量平貼減少反光";
                 }
                 
                 // 顯示原文
                 document.getElementById("ocrOriginal").innerHTML = `📄 辨識原文：<br>${escapeHtml(ocrText)}`;
+                document.getElementById("ocrTranslated").innerHTML = data.translatedText || "翻譯中...";
                 
-                // 翻譯成繁體中文
-                statusDiv.innerText = "🔄 Google 翻譯中...";
-                try {
-                    const res = await fetch("/translate_ocr", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ text: ocrText })
-                    });
-                    const data = await res.json();
-                    const translated = data.translatedText || "翻譯失敗";
-                    document.getElementById("ocrTranslated").innerText = translated;
-                    lastSpeakText = translated;
-                    statusDiv.innerText = "✅ OCR 完成！自動朗讀翻譯";
-                    speak(translated, "zh-TW");
-                } catch (transErr) {
-                    console.error("翻譯錯誤", transErr);
-                    document.getElementById("ocrTranslated").innerText = "翻譯服務錯誤";
-                    statusDiv.innerText = "⚠️ 翻譯失敗，但原文已辨識";
-                }
+                lastSpeakText = data.translatedText;
+                statusDiv.innerText = "✅ 辨識完成！自動朗讀翻譯";
+                speak(data.translatedText, "zh-TW");
                 
             } catch (err) {
                 console.error("OCR錯誤", err);
-                statusDiv.innerText = "⚠️ OCR 辨識失敗，請重新拍攝";
-                document.getElementById("ocrOriginal").innerHTML = "辨識錯誤，請確保圖片清晰、光線充足";
+                statusDiv.innerText = "⚠️ 辨識失敗，請重新拍攝";
+                document.getElementById("ocrOriginal").innerHTML = "辨識錯誤：\n" + (err.message || "請確保圖片清晰、光線充足");
                 document.getElementById("ocrTranslated").innerText = "無法翻譯";
-                progressBar.style.display = "none";
             } finally {
                 ocrBox.classList.remove("loading-pulse");
+                setTimeout(() => {
+                    progressBar.style.display = "none";
+                    progressFill.style.width = "0%";
+                }, 500);
             }
         }
 
@@ -669,7 +672,7 @@
                 const img = document.getElementById("previewImage");
                 img.src = ev.target.result;
                 img.style.display = "block";
-                document.getElementById("status").innerText = "🖼️ 圖片已載入，點擊「Tesseract OCR 辨識」";
+                document.getElementById("status").innerText = "🖼️ 圖片已載入，點擊「AI 強化辨識」";
                 document.getElementById("ocrOriginal").innerHTML = "📖 新圖片已選取，按下辨識按鈕";
                 document.getElementById("ocrTranslated").innerText = "等待辨識";
             };
