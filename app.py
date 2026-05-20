@@ -10,7 +10,7 @@ from flask import (
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
 
-# 只有 OCR 核心才引入 Google GenAI
+# 只有 OCR 核心部分使用 Google GenAI 套件
 from google import genai
 from google.genai import types
 
@@ -26,11 +26,11 @@ BASE_DIR = os.path.dirname(
 )
 
 # 初始化 Gemini 客戶端 (會自動讀取環境變數 GEMINI_API_KEY)
-# 你可以到 Google AI Studio 免費申請一支 Key
+# 請至 Google AI Studio 免費申請 API Key 並設定到環境變數中
 client = genai.Client()
 
 # =========================
-# 載入語言
+# 載入語言清單
 # =========================
 def load_languages():
     lang_path = os.path.join(
@@ -58,7 +58,7 @@ def get_lang_code(name):
     return "en"
 
 # =========================
-# 靜態檔案路由
+# 靜態檔案路徑路由
 # =========================
 @app.route("/")
 def index():
@@ -77,7 +77,7 @@ def get_langs():
     return jsonify(LANGUAGES)
 
 # =========================
-# 語音翻譯 API (完全保留原本的 Google 翻譯)
+# 語音/文字對談翻譯 API (使用原本的 Google 翻譯)
 # =========================
 @app.route("/translate", methods=["POST"])
 def translate():
@@ -101,7 +101,7 @@ def translate():
             source = target_code
             target = "zh-TW"
 
-        # 使用原本的 deep-translator
+        # 使用原本的 deep-translator 進行字串翻譯
         result = GoogleTranslator(
             source=source,
             target=target
@@ -118,7 +118,7 @@ def translate():
         }), 500
 
 # =========================
-# 拍照辨識 API (只有這裡升級強大的 AI 視覺)
+# 拍照辨識 API (職責分離：AI 只做 OCR 抓取，Google 負責長文翻譯)
 # =========================
 @app.route("/ocr_translate", methods=["POST"])
 def ocr_translate():
@@ -129,12 +129,14 @@ def ocr_translate():
         file = request.files['image']
         image_bytes = file.read()
         
-        # 透過 Gemini 2.5 Flash 直接進行「圖片文字辨識」加「翻譯成繁體中文」
+        # 1. 第一步：讓 Gemini 2.5 Flash 專心把圖片內的所有字摳出來（拔除 JSON 以免大段文字噴錯）
         prompt = (
-            "這是一張由翻譯 APP 拍攝的照片。請精準辨識出圖片中所有的文字（OCR），"
-            "並將這些文字翻譯成『繁體中文（台灣習慣用語）』。\n"
-            "請嚴格並僅以 JSON 格式回傳，格式如下：\n"
-            '{"originalText": "辨識出的原本文字", "translatedText": "翻譯後的繁體中文"}'
+            "這是一張由翻譯 APP 拍攝的照片。請以最高的準確度，"
+            "精準辨識並寫出圖片中所有的文字（OCR）。\n"
+            "注意事項：\n"
+            "1. 不要進行任何翻譯，直接輸出原本的語言文字即可。\n"
+            "2. 保持原本的排版與換行。\n"
+            "3. 不要添加任何多餘的解釋或 Markdown 標記（如 ``` 等）。"
         )
 
         response = client.models.generate_content(
@@ -145,24 +147,39 @@ def ocr_translate():
                     mime_type=file.content_type
                 ),
                 prompt,
-            ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
+            ]
         )
 
-        # 解析 AI 吐回來的結構化 JSON 資料
-        result_json = json.loads(response.text)
+        ocr_text = response.text.strip() if response.text else ""
+        
+        if not ocr_text:
+            return jsonify({
+                "ocrOriginal": "無法辨識圖片中的文字",
+                "ocrTranslated": "請重新拍攝清楚的圖片"
+            })
+
+        # 2. 第二步：辨識出來的純文字，直接丟給 Google 翻譯處理長文
+        # 設定為自動偵測來源語言 (source="auto")，統一翻譯成台灣習慣的繁體中文
+        try:
+            translated_text = GoogleTranslator(
+                source="auto",
+                target="zh-TW"
+            ).translate(ocr_text)
+        except Exception as trans_err:
+            print("OCR 辨識後的 Google 翻譯階段失敗:", trans_err)
+            translated_text = "文字辨識成功，但翻譯時發生錯誤。"
+
+        # 3. 乾乾淨淨地回傳給前端渲染
         return jsonify({
-            "ocrOriginal": result_json.get("originalText", "").strip(),
-            "ocrTranslated": result_json.get("translatedText", "").strip()
+            "ocrOriginal": ocr_text,
+            "ocrTranslated": translated_text
         })
 
     except Exception as e:
-        print("OCR 辨識或翻譯錯誤:", e)
+        print("OCR 核心流程發生錯誤:", e)
         return jsonify({
             "ocrOriginal": "辨識失敗",
-            "ocrTranslated": "後端服務錯誤"
+            "ocrTranslated": "後端視覺辨識暫時無法回應"
         }), 500
 
 # =========================
@@ -173,7 +190,7 @@ def health():
     return "OK", 200
 
 # =========================
-# 啟動
+# 啟動伺服器
 # =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
