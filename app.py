@@ -3,7 +3,7 @@ import json
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
-import google.generativeai as genai  # ← 修正這裡
+import google.generativeai as genai
 import io
 from PIL import Image, ImageEnhance, ImageFilter
 
@@ -12,9 +12,9 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 初始化 Gemini (修正後的寫法)
+# 初始化 Gemini
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-client = genai.GenerativeModel('gemini-2.0-flash-exp')  # ← 修正這裡
+model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 # ================== 載入語言清單 ==================
 def load_languages():
@@ -121,16 +121,14 @@ def ocr_translate():
 
 請輸出圖片中的文字："""
         
-        # 修正後的 Gemini 調用方式
-        response = client.generate_content(
-            contents=[
-                {
-                    "mime_type": "image/jpeg",
-                    "data": enhanced_bytes
-                },
-                prompt_text
-            ]
-        )
+        # 將圖片轉為 base64 格式
+        import base64
+        image_b64 = base64.b64encode(enhanced_bytes).decode('utf-8')
+        
+        response = model.generate_content([
+            {"mime_type": "image/jpeg", "data": enhanced_bytes},
+            prompt_text
+        ])
         
         ocr_text = response.text.strip() if response.text else ""
         
@@ -151,7 +149,7 @@ def ocr_translate():
     except Exception as e:
         print("OCR 錯誤:", e)
         return jsonify({
-            "ocrOriginal": f"辨識失敗",
+            "ocrOriginal": f"辨識失敗: {str(e)}",
             "ocrTranslated": "請重新拍攝"
         }), 500
 
