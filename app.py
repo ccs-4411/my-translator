@@ -9,7 +9,8 @@ from flask import (
 )
 from flask_cors import CORS
 from deep_translator import GoogleTranslator
-# 引入 Google 新版 GenAI 套件
+
+# 只有 OCR 核心才引入 Google GenAI
 from google import genai
 from google.genai import types
 
@@ -25,7 +26,7 @@ BASE_DIR = os.path.dirname(
 )
 
 # 初始化 Gemini 客戶端 (會自動讀取環境變數 GEMINI_API_KEY)
-# 如果不想設環境變數，也可以寫成 client = genai.Client(api_key="你的KEY")
+# 你可以到 Google AI Studio 免費申請一支 Key
 client = genai.Client()
 
 # =========================
@@ -57,7 +58,7 @@ def get_lang_code(name):
     return "en"
 
 # =========================
-# 首頁、manifest、sw.js
+# 靜態檔案路由
 # =========================
 @app.route("/")
 def index():
@@ -76,7 +77,7 @@ def get_langs():
     return jsonify(LANGUAGES)
 
 # =========================
-# 語音翻譯 API
+# 語音翻譯 API (完全保留原本的 Google 翻譯)
 # =========================
 @app.route("/translate", methods=["POST"])
 def translate():
@@ -91,39 +92,44 @@ def translate():
 
         target_code = get_lang_code(target_name)
 
+        # 中文 → 外語
         if mode == "me":
             source = "zh-TW"
             target = target_code
+        # 外語 → 中文
         else:
             source = target_code
             target = "zh-TW"
 
+        # 使用原本的 deep-translator
         result = GoogleTranslator(
             source=source,
             target=target
         ).translate(text)
 
-        return jsonify({"translatedText": result})
+        return jsonify({
+            "translatedText": result
+        })
 
     except Exception as e:
-        print("翻譯錯誤:", e)
-        return jsonify({"translatedText": "翻譯失敗"}), 500
+        print("語音/文字翻譯錯誤:", e)
+        return jsonify({
+            "translatedText": "翻譯失敗"
+        }), 500
 
 # =========================
-# 【全新加入】終極拍照辨識與翻譯 API
+# 拍照辨識 API (只有這裡升級強大的 AI 視覺)
 # =========================
 @app.route("/ocr_translate", methods=["POST"])
 def ocr_translate():
     try:
-        # 1. 檢查有沒有上傳檔案
         if 'image' not in request.files:
             return jsonify({"error": "沒有上傳圖片"}), 400
             
         file = request.files['image']
         image_bytes = file.read()
         
-        # 2. 呼叫最強大的 Gemini 2.5 Flash 來進行視覺辨識與直接翻譯
-        # 我們直接給 AI 提示詞，要它同時吐出「原文」與「中文翻譯」，免去二次呼叫 API 的時間
+        # 透過 Gemini 2.5 Flash 直接進行「圖片文字辨識」加「翻譯成繁體中文」
         prompt = (
             "這是一張由翻譯 APP 拍攝的照片。請精準辨識出圖片中所有的文字（OCR），"
             "並將這些文字翻譯成『繁體中文（台灣習慣用語）』。\n"
@@ -140,13 +146,12 @@ def ocr_translate():
                 ),
                 prompt,
             ],
-            # 強制要求模型只回傳 JSON 物件
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
             ),
         )
 
-        # 3. 解析 AI 回傳的 JSON 結果
+        # 解析 AI 吐回來的結構化 JSON 資料
         result_json = json.loads(response.text)
         return jsonify({
             "ocrOriginal": result_json.get("originalText", "").strip(),
@@ -154,7 +159,7 @@ def ocr_translate():
         })
 
     except Exception as e:
-        print("拍照辨識或翻譯錯誤:", e)
+        print("OCR 辨識或翻譯錯誤:", e)
         return jsonify({
             "ocrOriginal": "辨識失敗",
             "ocrTranslated": "後端服務錯誤"
@@ -167,6 +172,12 @@ def ocr_translate():
 def health():
     return "OK", 200
 
+# =========================
+# 啟動
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
