@@ -12,11 +12,10 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 初始化 Gemini
+# 初始化 Gemini (正確寫法)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
-# ================== 載入語言清單 ==================
 def load_languages():
     lang_path = os.path.join(BASE_DIR, "languages.json")
     if os.path.exists(lang_path):
@@ -32,7 +31,6 @@ def get_lang_code(name):
             return lang["code"]
     return "en"
 
-# ================== 靜態路由 ==================
 @app.route("/")
 def index():
     return send_from_directory(BASE_DIR, "index.html")
@@ -49,7 +47,6 @@ def sw():
 def get_langs():
     return jsonify(LANGUAGES)
 
-# ================== 語音翻譯 ==================
 @app.route("/translate", methods=["POST"])
 def translate():
     try:
@@ -76,7 +73,6 @@ def translate():
         print("翻譯錯誤:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
-# ================== 圖片預處理 ==================
 def preprocess_image(image_bytes):
     try:
         img = Image.open(io.BytesIO(image_bytes))
@@ -100,7 +96,6 @@ def preprocess_image(image_bytes):
         print("預處理異常:", e)
         return image_bytes
 
-# ================== OCR 辨識 + 翻譯 ==================
 @app.route("/ocr_translate", methods=["POST"])
 def ocr_translate():
     try:
@@ -120,10 +115,6 @@ def ocr_translate():
 4. 不要使用Markdown或代碼框
 
 請輸出圖片中的文字："""
-        
-        # 將圖片轉為 base64 格式
-        import base64
-        image_b64 = base64.b64encode(enhanced_bytes).decode('utf-8')
         
         response = model.generate_content([
             {"mime_type": "image/jpeg", "data": enhanced_bytes},
