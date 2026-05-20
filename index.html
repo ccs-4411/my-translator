@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>AI 翻譯官 - 強化OCR辨識</title>
+    <title>AI 翻譯官 - Tesseract OCR</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1a73e8">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -137,6 +138,8 @@
             white-space: pre-wrap;
             word-break: break-word;
             line-height: 1.4;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
         #translated,
@@ -215,6 +218,43 @@
             background: #d93025;
         }
 
+        /* 語言選擇器 */
+        .ocr-lang-select {
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .ocr-lang-select label {
+            font-size: 0.85rem;
+            color: #5f6368;
+            margin-right: 10px;
+        }
+
+        .ocr-lang-select select {
+            width: auto;
+            display: inline-block;
+            padding: 8px 12px;
+            margin-bottom: 0;
+            font-size: 0.85rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #1a73e8;
+            transition: width 0.3s;
+        }
+
         .tip {
             margin-top: 18px;
             background: #e8f0fe;
@@ -250,7 +290,7 @@
         </div>
         <div id="status">✅ 準備就緒</div>
 
-        <!-- 語音區塊 - 使用 Google 翻譯 -->
+        <!-- 語音區塊 -->
         <div id="voicePage">
             <select id="target"></select>
             <div class="btn-group">
@@ -266,24 +306,42 @@
             </div>
         </div>
 
-        <!-- OCR 掃描區塊 - 強化版 (Gemini OCR + Google 翻譯) -->
+        <!-- OCR 掃描區塊 - 使用 Tesseract.js -->
         <div id="ocrPage">
             <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
             <img id="previewImage" alt="預覽圖片">
+            
+            <div class="ocr-lang-select">
+                <label>🔤 辨識語言：</label>
+                <select id="ocrLang">
+                    <option value="eng">英文 (English)</option>
+                    <option value="chi_tra">繁體中文</option>
+                    <option value="chi_sim">簡體中文</option>
+                    <option value="jpn">日文</option>
+                    <option value="kor">韓文</option>
+                    <option value="eng+chi_tra">英文+繁體中文</option>
+                    <option value="eng+jpn">英文+日文</option>
+                </select>
+            </div>
+
             <div class="ocr-buttons">
                 <button id="pickBtn">📷 拍照 / 選照片</button>
-                <button id="scanBtn">✨ 增強OCR辨識</button>
+                <button id="scanBtn">🔍 Tesseract OCR 辨識</button>
+            </div>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
             </div>
             <div class="ocr-buttons">
                 <button id="ocrSpeakBtn">🔊 朗讀翻譯</button>
                 <button id="stopBtn">⛔ 停止朗讀</button>
             </div>
             <div id="ocr-result-box">
-                <div id="ocrOriginal">📖 等待掃描圖片，支援中/英/日/韓⋯</div>
-                <div id="ocrTranslated">✨ 繁體中文翻譯</div>
+                <div id="ocrOriginal">📖 等待掃描圖片...</div>
+                <div id="ocrTranslated">✨ 翻譯結果</div>
             </div>
             <div class="tip">
-                💡 <strong>OCR 強化技術</strong>：AI 精準文字擷取 + Google 翻譯，大幅提升辨識率！
+                💡 <strong>Tesseract OCR 引擎</strong>：專業光學字元辨識，對英文、數字、印刷體辨識率極高！<br>
+                📌 建議：圖片越清晰、對比度越高，辨識效果越好。
             </div>
         </div>
     </div>
@@ -295,6 +353,7 @@
         let lastSpeakText = "";
         let lastSpeakLang = "zh-TW";
         let selectedImageFile = null;
+        let currentImageUrl = null;
 
         // ========== Service Worker ==========
         if ('serviceWorker' in navigator) {
@@ -305,13 +364,13 @@
         function showVoicePage() {
             document.getElementById("voicePage").style.display = "block";
             document.getElementById("ocrPage").style.display = "none";
-            document.getElementById("status").innerText = "🎤 語音模式 (Google 翻譯)";
+            document.getElementById("status").innerText = "🎤 語音模式";
         }
 
         function showOCRPage() {
             document.getElementById("voicePage").style.display = "none";
             document.getElementById("ocrPage").style.display = "block";
-            document.getElementById("status").innerText = "📸 掃描模式 (AI 強化辨識)";
+            document.getElementById("status").innerText = "📸 掃描模式 (Tesseract OCR)";
         }
 
         // ========== 語音合成初始化 ==========
@@ -373,8 +432,6 @@
                 const btnOther = document.getElementById("btn-other");
                 btnMe.classList.remove("active-mic");
                 btnOther.classList.remove("active-mic");
-                if (document.getElementById("status").innerText.includes("聆聽中"))
-                    document.getElementById("status").innerText = "✅ 就緒";
             };
             recognition.onresult = (e) => {
                 const text = e.results[0][0].transcript;
@@ -455,8 +512,8 @@
             if (lastSpeakText) speak(lastSpeakText, lastSpeakLang);
         }
 
-        // ========== OCR 強化：前端預處理 ==========
-        async function enhanceImageForOCR(file) {
+        // ========== 圖片預處理 (增強對比度) ==========
+        async function preprocessImage(file) {
             return new Promise((resolve) => {
                 const img = new Image();
                 const url = URL.createObjectURL(file);
@@ -468,76 +525,121 @@
                         height = (height * MAX_WIDTH) / width;
                         width = MAX_WIDTH;
                     }
+                    
                     const canvas = document.createElement('canvas');
                     canvas.width = width;
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-
-                    // 對比增強讓文字更清晰
-                    try {
-                        const imageData = ctx.getImageData(0, 0, width, height);
-                        const data = imageData.data;
-                        for (let i = 0; i < data.length; i += 4) {
-                            let r = data[i];
-                            let g = data[i + 1];
-                            let b = data[i + 2];
-                            const contrast = 1.15;
-                            r = Math.min(255, Math.max(0, (r - 128) * contrast + 128));
-                            g = Math.min(255, Math.max(0, (g - 128) * contrast + 128));
-                            b = Math.min(255, Math.max(0, (b - 128) * contrast + 128));
-                            data[i] = r;
-                            data[i + 1] = g;
-                            data[i + 2] = b;
-                        }
-                        ctx.putImageData(imageData, 0, 0);
-                    } catch (e) { console.warn(e); }
-
+                    
+                    // 增強對比度讓文字更清晰
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        let r = data[i];
+                        let g = data[i + 1];
+                        let b = data[i + 2];
+                        // 對比度增強
+                        const contrast = 1.2;
+                        r = Math.min(255, Math.max(0, (r - 128) * contrast + 128));
+                        g = Math.min(255, Math.max(0, (g - 128) * contrast + 128));
+                        b = Math.min(255, Math.max(0, (b - 128) * contrast + 128));
+                        data[i] = r;
+                        data[i + 1] = g;
+                        data[i + 2] = b;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    
                     canvas.toBlob(blob => {
                         URL.revokeObjectURL(url);
                         resolve(blob);
-                    }, "image/jpeg", 0.92);
+                    }, "image/jpeg", 0.9);
                 };
                 img.src = url;
             });
         }
 
-        // 掃描主流程 (Gemini OCR + Google 翻譯)
-        async function scanText() {
+        // ========== Tesseract OCR 辨識 ==========
+        async function performOCR() {
             if (!selectedImageFile) {
-                alert("請先拍照或選取清晰的圖片");
+                alert("請先拍照或選取圖片");
                 return;
             }
 
             const statusDiv = document.getElementById("status");
             const ocrBox = document.getElementById("ocr-result-box");
-            statusDiv.innerText = "🔍 AI 辨識文字中...";
+            const progressBar = document.getElementById("progressBar");
+            const progressFill = document.getElementById("progressFill");
+            
+            statusDiv.innerText = "🔍 圖片預處理中...";
             ocrBox.classList.add("loading-pulse");
-
+            
             try {
-                const enhancedBlob = await enhanceImageForOCR(selectedImageFile);
-                const formData = new FormData();
-                formData.append("image", enhancedBlob, "ocr_enhanced.jpg");
-
-                const response = await fetch("/ocr_translate", {
-                    method: "POST",
-                    body: formData,
+                // 預處理圖片
+                const processedBlob = await preprocessImage(selectedImageFile);
+                const imageUrl = URL.createObjectURL(processedBlob);
+                const img = new Image();
+                img.src = imageUrl;
+                
+                await new Promise((resolve) => { img.onload = resolve; });
+                
+                const ocrLang = document.getElementById("ocrLang").value;
+                statusDiv.innerText = `🔍 Tesseract OCR 辨識中 (${ocrLang})...`;
+                progressBar.style.display = "block";
+                
+                // 使用 Tesseract.js 進行 OCR
+                const worker = await Tesseract.createWorker();
+                await worker.loadLanguage(ocrLang);
+                await worker.initialize(ocrLang);
+                
+                // 設定進度回調
+                worker.setProgress((p) => {
+                    const percent = Math.round(p.progress * 100);
+                    progressFill.style.width = `${percent}%`;
+                    statusDiv.innerText = `🔍 OCR 辨識中... ${percent}%`;
                 });
-
-                if (!response.ok) throw new Error(`OCR服務異常 ${response.status}`);
-                const data = await response.json();
-
-                document.getElementById("ocrOriginal").innerHTML = `📄 辨識原文：<br>${escapeHtml(data.ocrOriginal || "無文字")}`;
-                document.getElementById("ocrTranslated").innerText = data.ocrTranslated || "翻譯結果遺失";
-
-                lastSpeakText = data.ocrTranslated;
-                statusDiv.innerText = "✅ OCR 完成！自動朗讀翻譯";
-                speak(data.ocrTranslated, "zh-TW");
+                
+                const { data: { text } } = await worker.recognize(img);
+                await worker.terminate();
+                
+                URL.revokeObjectURL(imageUrl);
+                progressBar.style.display = "none";
+                progressFill.style.width = "0%";
+                
+                let ocrText = text.trim();
+                if (!ocrText || ocrText.length < 2) {
+                    ocrText = "無法辨識文字，請確保圖片清晰、光線充足，並選擇正確的語言。";
+                }
+                
+                // 顯示原文
+                document.getElementById("ocrOriginal").innerHTML = `📄 辨識原文：<br>${escapeHtml(ocrText)}`;
+                
+                // 翻譯成繁體中文
+                statusDiv.innerText = "🔄 Google 翻譯中...";
+                try {
+                    const res = await fetch("/translate_ocr", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: ocrText })
+                    });
+                    const data = await res.json();
+                    const translated = data.translatedText || "翻譯失敗";
+                    document.getElementById("ocrTranslated").innerText = translated;
+                    lastSpeakText = translated;
+                    statusDiv.innerText = "✅ OCR 完成！自動朗讀翻譯";
+                    speak(translated, "zh-TW");
+                } catch (transErr) {
+                    console.error("翻譯錯誤", transErr);
+                    document.getElementById("ocrTranslated").innerText = "翻譯服務錯誤";
+                    statusDiv.innerText = "⚠️ 翻譯失敗，但原文已辨識";
+                }
+                
             } catch (err) {
                 console.error("OCR錯誤", err);
-                statusDiv.innerText = "⚠️ 辨識失敗，請確保圖片光線充足且文字清晰";
-                document.getElementById("ocrOriginal").innerHTML = "辨識錯誤，請重新拍攝或選取文字清晰的圖片";
+                statusDiv.innerText = "⚠️ OCR 辨識失敗，請重新拍攝";
+                document.getElementById("ocrOriginal").innerHTML = "辨識錯誤，請確保圖片清晰、光線充足";
                 document.getElementById("ocrTranslated").innerText = "無法翻譯";
+                progressBar.style.display = "none";
             } finally {
                 ocrBox.classList.remove("loading-pulse");
             }
@@ -567,14 +669,14 @@
                 const img = document.getElementById("previewImage");
                 img.src = ev.target.result;
                 img.style.display = "block";
-                document.getElementById("status").innerText = "🖼️ 圖片已載入，點擊「增強OCR辨識」";
+                document.getElementById("status").innerText = "🖼️ 圖片已載入，點擊「Tesseract OCR 辨識」";
                 document.getElementById("ocrOriginal").innerHTML = "📖 新圖片已選取，按下辨識按鈕";
                 document.getElementById("ocrTranslated").innerText = "等待辨識";
             };
             reader.readAsDataURL(file);
         });
 
-        document.getElementById("scanBtn").addEventListener("click", scanText);
+        document.getElementById("scanBtn").addEventListener("click", performOCR);
         document.getElementById("ocrSpeakBtn").addEventListener("click", () => {
             if (lastSpeakText) speak(lastSpeakText, "zh-TW");
             else alert("尚無翻譯結果，請先進行OCR辨識");
