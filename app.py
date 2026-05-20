@@ -76,110 +76,93 @@ def translate():
         print("翻譯錯誤:", e)
         return jsonify({"translatedText": "翻譯失敗"}), 500
 
-# ================== Gemini OCR 強化版 (專為藥品文字) ==================
-def preprocess_image_advanced(image_bytes):
-    """進階圖片前處理：去反光、增強對比、銳利化"""
+# ================== 圖片預處理 ==================
+def preprocess_image(image_bytes):
+    """圖片預處理：增強對比、銳利化"""
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ('RGBA', 'LA', 'P'):
             img = img.convert('RGB')
         
-        # 縮放到合理大小
+        # 限制最大寬度
         max_width = 2000
         if img.width > max_width:
             ratio = max_width / img.width
             new_size = (max_width, int(img.height * ratio))
             img = img.resize(new_size, Image.Resampling.LANCZOS)
         
-        # 強烈對比增強 (藥品文字通常較淡)
+        # 對比度增強
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.5)
-        
-        # 亮度增強
-        enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(1.1)
+        img = enhancer.enhance(1.4)
         
         # 銳利化
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=200, threshold=2))
+        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=150, threshold=2))
         
         output = io.BytesIO()
-        img.save(output, format='JPEG', quality=95, optimize=True)
+        img.save(output, format='JPEG', quality=92, optimize=True)
         return output.getvalue()
     except Exception as e:
         print("預處理異常:", e)
         return image_bytes
 
-@app.route("/ocr_gemini", methods=["POST"])
-def ocr_gemini():
+# ================== OCR 辨識 + 翻譯 ==================
+@app.route("/ocr_translate", methods=["POST"])
+def ocr_translate():
     try:
         if 'image' not in request.files:
             return jsonify({"error": "沒有上傳圖片"}), 400
         
         file = request.files['image']
-        mode = request.form.get('mode', 'medicine')
         raw_bytes = file.read()
         
-        # 進階圖片預處理
-        enhanced_image_bytes = preprocess_image_advanced(raw_bytes)
+        # 圖片預處理
+        enhanced_bytes = preprocess_image(raw_bytes)
         
-        # 根據模式選擇不同的提示詞
-        if mode == "medicine":
-            prompt_text = """你是專業的藥品標籤OCR系統。請仔細分析這張藥品包裝/藥包/藥盒的圖片。
+        # Gemini OCR 提示詞 - 專注精準辨識
+        prompt_text = """你是專業的OCR文字辨識系統。請仔細掃描這張圖片中的所有文字。
 
-重要規則（嚴格遵守）：
-1. 只輸出圖片中的原始文字，不要翻譯、不要解釋、不要加註釋
-2. 特別注意辨識以下藥品相關內容：
-   - 藥品名稱 (Brand/Generic name)
-   - 劑量 (mg, mcg, g 等)
-   - 用法用量 (Take, Daily, Once, Twice, etc.)
-   - 有效期限 (EXP, Expiry, Use by)
-   - 批號 (Lot, Batch)
-3. 保留所有數字、單位、標點符號
-4. 如果文字有反光或模糊，根據上下文盡可能推測正確文字
-5. 按原始順序輸出，保留換行
+嚴格遵守以下規則：
+1. 只輸出圖片中的原始文字，不要翻譯、不要解釋、不要加任何註釋
+2. 保留標點符號、數字、空格和原始換行結構
+3. 特別注意辨識：
+   - 英文單字和數字（尤其是藥品名稱、劑量）
+   - 中文繁體/簡體字
+   - 日文、韓文等
+4. 如果文字有反光或稍微模糊，請根據形狀盡可能正確辨識
+5. 不要使用Markdown、不要用代碼框、不要添加任何額外說明
 
-請開始辨識藥品圖片中的文字："""
-        else:
-            prompt_text = """你是精準的OCR引擎。請仔細掃描這張圖片中的所有文字。
-
-規則：
-1. 只輸出原始文字，不要翻譯、不要解釋
-2. 保留標點符號、數字、空格和換行
-3. 支援英文、中文、日文、韓文混合
-4. 不要使用Markdown或代碼框
-
-請輸出圖片中的文字："""
+請直接輸出圖片中的文字："""
         
         response = client.models.generate_content(
             model='gemini-2.0-flash-exp',
             contents=[
-                types.Part.from_bytes(data=enhanced_image_bytes, mime_type="image/jpeg"),
+                types.Part.from_bytes(data=enhanced_bytes, mime_type="image/jpeg"),
                 prompt_text
             ]
         )
         
         ocr_text = response.text.strip() if response.text else ""
         
-        if not ocr_text or len(ocr_text) < 3:
-            ocr_text = "無法辨識文字。請確認：圖片光線充足、文字清晰、藥品平貼無反光"
+        if not ocr_text or len(ocr_text) < 2:
+            ocr_text = "無法辨識文字，請確認圖片光線充足、文字清晰"
         
-        # 翻譯成繁體中文
+        # 使用 Google 翻譯成繁體中文
         try:
             translated = GoogleTranslator(source='auto', target='zh-TW').translate(ocr_text)
         except Exception as trans_err:
             print("翻譯錯誤:", trans_err)
-            translated = "翻譯服務暫時異常，但原文已辨識如上"
+            translated = "翻譯服務暫時異常"
         
         return jsonify({
-            "ocrText": ocr_text,
-            "translatedText": translated
+            "ocrOriginal": ocr_text,
+            "ocrTranslated": translated
         })
         
     except Exception as e:
         print("OCR 錯誤:", e)
         return jsonify({
-            "ocrText": f"辨識失敗: {str(e)}",
-            "translatedText": "請重新拍攝，確保光線充足、文字清晰"
+            "ocrOriginal": f"辨識失敗: {str(e)}",
+            "ocrTranslated": "請重新拍攝，確保光線充足、文字清晰"
         }), 500
 
 @app.route('/health')
@@ -188,4 +171,4 @@ def health():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)
