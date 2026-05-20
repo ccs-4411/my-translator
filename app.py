@@ -17,8 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
-    # 使用 gemini-1.5-flash，反應速度最適合行動端應用
-    model = genai.GenerativeModel('gemini-1.5-flash')  
+    # 使用 gemini-2.5-flash，反應速度最適合行動端應用
+    model = genai.GenerativeModel('gemini-2.5-flash')  
     print("Gemini API 初始化成功")
 else:
     print("⚠️ 警告: 未在環境變數中設定 GEMINI_API_KEY")
@@ -149,4 +149,4 @@ if __name__ == "__main__":
     # 對接 Render 或其他雲端平台使用的動態 Port 綁定
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
-</html>
+
