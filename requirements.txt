@@ -1,6 +1,6 @@
-Flask
-flask-cors
-deep-translator
-gTTS
-gunicorn
+Flask==3.0.2
+werkzeug==3.0.1
+deep-translator==1.11.4
+easyocr==1.7.1
+gunicorn==26.0.0
 
