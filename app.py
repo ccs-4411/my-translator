@@ -1,30 +1,12 @@
 import os
 import json
 from flask import Flask, request, jsonify, render_template
-from werkzeug.utils import secure_filename
 from deep_translator import GoogleTranslator
-from PIL import Image
-import io
-import pytesseract
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 app = Flask(__name__)
 
-# 語言名稱對照 Tesseract 的語言代碼 (Tesseract 的多國語言包)
-# eng=英文, jpn=日文, kor=韓文, chi_tra=繁體中文
-OCR_LANG_MAP = {
-    "日文": "jpn",
-    "韓文": "kor",
-    "英文": "eng",
-    "法文": "fra",
-    "德文": "deu",
-    "西班牙文": "spa",
-    "越南文": "vie",
-    "泰文": "tha"
-}
-
-# 轉換為 Google 翻譯相容的語言代碼
+# 網頁支援的外語代碼對照表
 TRANS_LANG_MAP = {
     "日文": "ja", "韓文": "ko", "英文": "en", "法文": "fr",
     "德文": "de", "西班牙文": "es", "越南文": "vi", "泰文": "th"
@@ -49,7 +31,7 @@ def index():
 def get_languages():
     return jsonify(LANGUAGES)
 
-# 🎤 路由 1：語音/文字翻譯（超輕量，不用 Key）
+# 🎤 語音與文字翻譯路由（完全免費、不用 API Key）
 @app.route('/translate', methods=['POST'])
 @app.route('/api/translate', methods=['POST'])
 def translate():
@@ -57,7 +39,7 @@ def translate():
         data = request.json or {}
         text = data.get('text', '')
         target_name = data.get('target', '英文')
-        mode = data.get('mode', 'me')
+        mode = data.get('mode', 'me') # me: 中翻外, other: 外翻中
 
         if not text:
             return jsonify({"translatedText": ""})
@@ -77,47 +59,24 @@ def translate():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 📸 路由 2：圖片 OCR 翻譯（改用輕量 Tesseract，記憶體安全）
-@app.route('/ocr_translate', methods=['POST'])
-@app.route('/api/ocr_translate', methods=['POST'])
-def ocr_translate():
+# 📸 圖片純文字翻譯路由（後端只負責把前端辨識好的字拿來翻譯）
+@app.route('/ocr_translate_text', methods=['POST'])
+@app.route('/api/ocr_translate_text', methods=['POST'])
+def ocr_translate_text():
     try:
-        if 'image' not in request.files:
-            return jsonify({"ocrOriginal": "", "ocrTranslated": "未接收到圖片檔案"}), 400
+        data = request.json or {}
+        ocr_text = data.get('text', '').strip()
+        target_lang_name = data.get('menu_lang', '日文')
 
-        image_file = request.files['image']
-        target_lang_name = request.form.get('menu_lang', '日文')  
-        image_bytes = image_file.read()
+        if not ocr_text:
+            return jsonify({"ocrOriginal": "", "ocrTranslated": "未能識別出文字"})
 
-        if not image_bytes:
-            return jsonify({"ocrOriginal": "", "ocrTranslated": "圖片資料為空"}), 400
-
-        # 將圖片位元組轉換為 PIL Image 物件
-        img = Image.open(io.BytesIO(image_bytes))
-
-        # 取得對應的 Tesseract 語言代碼
-        ocr_lang = OCR_LANG_MAP.get(target_lang_name, 'eng')
-
-        # 執行輕量化 OCR 辨識 (加上自動防錯，如果缺少字庫會自動用英文墊底)
-        try:
-            ocr_original_text = pytesseract.image_to_string(img, lang=ocr_lang)
-        except Exception:
-            # 萬一雲端環境缺少日韓文包，自動切換成萬用英文包辨識，防止程式當掉
-            ocr_original_text = pytesseract.image_to_string(img, lang='eng')
-
-        ocr_original_text = ocr_original_text.strip()
-        if not ocr_original_text:
-            return jsonify({
-                "ocrOriginal": "未能清晰辨識原文",
-                "ocrTranslated": "圖片中找不到可辨識的文字，請拉近或對準一點再試一次。"
-            })
-
-        # 轉換成 Google 翻譯的代碼並翻譯
+        # 取得對應語言代碼並用免費 Google 翻譯轉成繁中
         lang_code = TRANS_LANG_MAP.get(target_lang_name, 'auto')
-        translated_text = GoogleTranslator(source=lang_code, target='zh-TW').translate(ocr_original_text)
+        translated_text = GoogleTranslator(source=lang_code, target='zh-TW').translate(ocr_text)
 
         return jsonify({
-            "ocrOriginal": ocr_original_text,
+            "ocrOriginal": ocr_text,
             "ocrTranslated": translated_text
         })
     except Exception as e:
