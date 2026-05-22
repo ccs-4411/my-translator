@@ -1,576 +1,524 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>語音翻譯官</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>AI 翻譯官</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<style>
-body {
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    background:#f2f4f7;
-    margin:0;
-    padding:15px;
-    text-align:center;
-}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f1f3f4;
+            padding: 14px;
+        }
 
-.card {
-    max-width:450px;
-    margin:auto;
-    background:white;
-    padding:25px;
-    border-radius:30px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.1);
-}
+        .card {
+            max-width: 620px;
+            margin: auto;
+            background: white;
+            border-radius: 28px;
+            padding: 20px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+        }
 
-h2 {
-    color:#1a73e8;
-    margin-top:0;
-    font-size:1.6rem;
-    cursor:pointer;
-}
+        h2 {
+            text-align: center;
+            color: #1a73e8;
+            margin-bottom: 18px;
+        }
 
-#status {
-    font-size:0.95rem;
-    color:#1a73e8;
-    margin-bottom:12px;
-    font-weight:bold;
-    height:1.2em;
-}
+        .top-menu {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
 
-select {
-    width:100%;
-    padding:14px;
-    border-radius:15px;
-    border:2px solid #eee;
-    font-size:1.1rem;
-    margin-bottom:10px;
-}
+        .top-menu button {
+            flex: 1;
+            border: none;
+            border-radius: 999px;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-.btn-group {
-    display:flex;
-    gap:12px;
-    margin:20px 0;
-}
+        .top-menu button:first-child {
+            background: #1a73e8;
+            color: white;
+        }
 
-.mic-btn {
-    flex:1;
-    height:120px;
-    border:none;
-    border-radius:25px;
-    color:white;
-    font-size:1.2rem;
-    cursor:pointer;
-    font-weight:bold;
-    transition:0.2s;
-}
+        .top-menu button:last-child {
+            background: #34a853;
+            color: white;
+        }
 
-#btn-me {
-    background:#1a73e8;
-}
+        #status {
+            background: #e8f0fe;
+            color: #174ea6;
+            padding: 10px;
+            border-radius: 999px;
+            text-align: center;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
 
-#btn-other {
-    background:#34a853;
-}
+        select {
+            width: 100%;
+            padding: 14px;
+            border-radius: 20px;
+            border: 1px solid #dadce0;
+            margin-bottom: 16px;
+            font-size: 1rem;
+            background-color: #fff;
+        }
 
-.active {
-    background:#ea4335 !important;
-    transform:scale(0.97);
-}
+        .ocr-lang-select-wrap {
+            margin-bottom: 12px;
+        }
 
-#result-box {
-    background:#f8f9fa;
-    border-radius:20px;
-    padding:18px;
-    text-align:left;
-    min-height:120px;
-}
+        .ocr-lang-select-wrap label {
+            font-size: 0.9rem;
+            color: #5f6368;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 6px;
+            padding-left: 4px;
+        }
 
-#original {
-    color:#888;
-    border-bottom:1px solid #eee;
-    padding-bottom:8px;
-    font-size:1rem;
-}
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
 
-#translated {
-    font-size:1.6rem;
-    font-weight:bold;
-    margin-top:12px;
-    color:#111;
-}
+        .mic-btn {
+            flex: 1;
+            height: 120px;
+            border: none;
+            border-radius: 24px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-/* ⭐ 重播按鈕 */
-.play-group{
-    display:flex;
-    gap:10px;
-    margin-top:15px;
-}
+        #btn-me {
+            background: #1a73e8;
+        }
 
-.play-btn{
-    flex:1;
-    padding:14px;
-    border:none;
-    border-radius:15px;
-    color:white;
-    font-size:1rem;
-    font-weight:bold;
-    cursor:pointer;
-}
+        #btn-other {
+            background: #34a853;
+        }
 
-#replay-btn{
-    background:#ff9800;
-}
-</style>
+        .active-mic {
+            background: #ea4335 !important;
+            transform: scale(0.96);
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 22px;
+            padding: 18px;
+            margin-top: 18px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .original {
+            color: #5f6368;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .translated {
+            margin-top: 12px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .play-btn {
+            margin-top: 16px;
+            width: 100%;
+            border: none;
+            border-radius: 999px;
+            padding: 12px;
+            background: #ff9800;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #ocrPage {
+            display: none;
+        }
+
+        .video-wrap {
+            position: relative;
+            width: 100%;
+            height: 320px; 
+            border-radius: 24px;
+            overflow: hidden;
+            background: #000;
+            margin-bottom: 12px;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .scan-box {
+            position: absolute;
+            left: 5%;
+            top: 10%;
+            width: 90%;
+            height: 80%;
+            border: 3px solid #00ff88;
+            border-radius: 18px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); 
+            z-index: 10;
+            pointer-events: none; 
+        }
+
+        .ocr-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        /* 讓拍照按鈕又大又明顯 */
+        #startOCR {
+            background: #1a73e8;
+            font-size: 1.2rem;
+            padding: 16px;
+            border: none;
+            border-radius: 999px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+        }
+
+        #speakOCR {
+            background: #ff9800;
+            padding: 12px;
+            border: none;
+            border-radius: 999px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .tip {
+            margin-top: 14px;
+            background: #e8f0fe;
+            color: #174ea6;
+            padding: 12px;
+            border-radius: 18px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        canvas {
+            display: none;
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="card">
+    <div class="card">
+        <h2>🌍 AI 翻譯官</h2>
 
-    <h2 onclick="testSpeech()">語音翻譯官</h2>
+        <div class="top-menu">
+            <button onclick="showVoicePage()">🎤 語音翻譯</button>
+            <button onclick="showOCRPage()">📸 即時 OCR</button>
+        </div>
 
-    <div id="status">準備就緒</div>
+        <div id="status">✅ 準備就緒</div>
 
-    <select id="target"></select>
+        <!-- 語音翻譯頁面 -->
+        <div id="voicePage">
+            <select id="target"></select>
+            <div class="btn-group">
+                <button id="btn-me" class="mic-btn" onclick="runMic('me')">🎙️ 我說中文</button>
+                <button id="btn-other" class="mic-btn" onclick="runMic('other')">🗣️ 對方外語</button>
+            </div>
+            <div class="result-box">
+                <div id="original" class="original">等待說話...</div>
+                <div id="translated" class="translated">翻譯結果</div>
+                <button class="play-btn" onclick="replayAudio()">🔊 重播譯文</button>
+            </div>
+        </div>
 
-    <div class="btn-group">
+        <!-- OCR 拍照頁面 -->
+        <div id="ocrPage">
+            <div class="ocr-lang-select-wrap">
+                <label for="ocrTargetLang">🔍 請選擇要辨識的菜單語言：</label>
+                <select id="ocrTargetLang">
+                    <option value="日文">🇯🇵 日文菜單 (自動優化在地翻譯)</option>
+                    <option value="韓文">🇰🇷 韓文菜單 (自動優化在地翻譯)</option>
+                    <option value="英文">🇺🇸 英文菜單 (自動優化在地翻譯)</option>
+                </select>
+            </div>
 
-        <button id="btn-me"
-                class="mic-btn"
-                onclick="runMic('me')">
+            <div class="video-wrap">
+                <video id="video" autoplay playsinline muted></video>
+                <div class="scan-box"></div>
+            </div>
+            <canvas id="canvas"></canvas>
 
-            🎤 我講中文
+            <div class="ocr-btns">
+                <button id="startOCR">📸 拍照並送出翻譯</button>
+                <button id="speakOCR">🔊 朗讀翻譯結果</button>
+            </div>
 
-        </button>
+            <div class="result-box">
+                <div id="ocrOriginal" class="original">等待拍攝...</div>
+                <div id="ocrTranslated" class="translated">翻譯結果</div>
+            </div>
 
-        <button id="btn-other"
-                class="mic-btn"
-                onclick="runMic('other')">
-
-            🎧 對方講
-
-        </button>
-
+            <div class="tip">
+                💡 對準菜單文字後，按下上面的藍色【拍照並送出翻譯】按鈕即可。
+            </div>
+        </div>
     </div>
 
-    <div id="result-box">
+    <script>
+        let recognition = null;
+        let voices = [];
+        let lastText = "";
+        let lastLang = "zh-TW";
+        let isProcessingOCR = false;
 
-        <div id="original">
-            等待說話...
-        </div>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-        <div id="translated">
-            翻譯結果
-        </div>
-
-        <!-- ⭐ 重播 -->
-        <div class="play-group">
-
-            <button id="replay-btn"
-                    class="play-btn"
-                    onclick="replayAudio()">
-
-                🔊 重播
-
-            </button>
-
-        </div>
-
-    </div>
-
-</div>
-
-<script>
-
-let recognition = null;
-let isProcessing = false;
-let VOICES = [];
-let audioUnlocked = false;
-
-/* ⭐ 記錄最後播放 */
-let lastSpeakText = "";
-let lastSpeakLang = "";
-
-// ============================
-// ⭐ 1. 載入語音
-// ============================
-function loadVoices() {
-
-    return new Promise(resolve => {
-
-        let voices = speechSynthesis.getVoices();
-
-        if (voices.length) {
-            return resolve(voices);
+        function showVoicePage() {
+            document.getElementById('voicePage').style.display = 'block';
+            document.getElementById('ocrPage').style.display = 'none';
+            stopCamera();
+            document.getElementById('status').innerText = '🎤 語音翻譯模式';
         }
 
-        speechSynthesis.onvoiceschanged = () => {
-            resolve(speechSynthesis.getVoices());
+        async function showOCRPage() {
+            document.getElementById('voicePage').style.display = 'none';
+            document.getElementById('ocrPage').style.display = 'block';
+            document.getElementById('status').innerText = '📸 啟動相機中...';
+            await startCamera();
+        }
+
+        async function loadLanguages() {
+            try {
+                const res = await fetch(`${window.location.origin}/languages`);
+                const langs = await res.json();
+                const sel = document.getElementById('target');
+                sel.innerHTML = '';
+                langs.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.name;
+                    opt.textContent = `${l.name} ${l.label}`;
+                    opt.dataset.voice = l.voice;
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                console.error("載入語言失敗:", e);
+            }
+        }
+
+        async function loadVoices() {
+            return new Promise(resolve => {
+                let v = speechSynthesis.getVoices();
+                if (v.length) { resolve(v); }
+                speechSynthesis.onvoiceschanged = () => { resolve(speechSynthesis.getVoices()); };
+            });
+        }
+
+        function initRecognition() {
+            const Speech = window.webkitSpeechRecognition || window.SpeechRecognition;
+            if (!Speech) return;
+            recognition = new Speech();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.onstart = () => { document.getElementById('status').innerText = '🎙️ 聆聽中...'; };
+            recognition.onerror = () => { document.getElementById('status').innerText = '❌ 語音辨識失敗'; };
+            recognition.onend = () => {
+                document.getElementById('btn-me').classList.remove('active-mic');
+                document.getElementById('btn-other').classList.remove('active-mic');
+            };
+            recognition.onresult = (e) => {
+                const text = e.results[0][0].transcript;
+                document.getElementById('original').innerText = text;
+                translateText(text);
+            };
+        }
+
+        function runMic(mode) {
+            if (!recognition) { initRecognition(); }
+            if (!recognition) return;
+            const sel = document.getElementById('target');
+            recognition.lang = mode === 'me' ? 'zh-TW' : (sel.selectedOptions[0]?.dataset?.voice || 'en-US');
+            document.getElementById('btn-me').classList.remove('active-mic');
+            document.getElementById('btn-other').classList.remove('active-mic');
+            document.getElementById(`btn-${mode}`).classList.add('active-mic');
+            recognition.start();
+        }
+
+        async function translateText(text) {
+            try {
+                const sel = document.getElementById('target');
+                const targetName = sel.value;
+                const mode = recognition?.lang === 'zh-TW' ? 'me' : 'other';
+                const res = await fetch(`${window.location.origin}/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, target: targetName, mode })
+                });
+                const data = await res.json();
+                document.getElementById('translated').innerText = data.translatedText;
+                speak(data.translatedText, mode === 'me' ? (sel.selectedOptions[0]?.dataset?.voice || 'en-US') : 'zh-TW');
+                document.getElementById('status').innerText = '✅ 翻譯完成';
+            } catch (e) {
+                document.getElementById('status').innerText = '❌ 翻譯連線失敗';
+            }
+        }
+
+        async function speak(text, lang) {
+            if (!text) return;
+            lastText = text; lastLang = lang;
+            await loadVoices();
+            speechSynthesis.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = lang;
+            speechSynthesis.speak(utter);
+        }
+
+        function replayAudio() { if (lastText) speak(lastText, lastLang); }
+
+        async function startCamera() {
+            try {
+                stopCamera();
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: 1280, height: 720 },
+                    audio: false
+                });
+                video.srcObject = stream;
+                await video.play();
+                document.getElementById('status').innerText = '📷 相機已就緒，請對準菜單';
+            } catch (e) {
+                document.getElementById('status').innerText = '❌ 相機啟動失敗: ' + e.message;
+            }
+        }
+
+        function stopCamera() {
+            const stream = video.srcObject;
+            if (stream) { stream.getTracks().forEach(track => track.stop()); video.srcObject = null; }
+        }
+
+        // 🌟 核心修正：點擊才拍照觸發，徹底避免無限循環卡死
+        document.getElementById('startOCR').onclick = async () => {
+            if (isProcessingOCR) {
+                alert("上一次的辨識尚未結束，請稍候...");
+                return;
+            }
+            if (video.videoWidth === 0) {
+                document.getElementById('status').innerText = '❌ 相機尚未準備好影像訊號';
+                return;
+            }
+
+            try {
+                isProcessingOCR = true;
+                document.getElementById('status').innerText = '🔍 正在把照片送交 Gemini 辨識中...';
+                document.getElementById('ocrOriginal').innerText = "正在傳送照片...";
+                document.getElementById('ocrTranslated').innerText = "計算中...";
+
+                // 直接抓取相機解析度
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // 轉為 JPG 二進位檔
+                canvas.toBlob(async (blob) => {
+                    if (!blob) {
+                        document.getElementById('status').innerText = '❌ 圖片轉檔 Blob 失敗';
+                        isProcessingOCR = false;
+                        return;
+                    }
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('image', blob, 'ocr.jpg');
+                        formData.append('menu_lang', document.getElementById('ocrTargetLang').value);
+
+                        // 呼叫後端
+                        const res = await fetch(`${window.location.origin}/ocr_translate`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!res.ok) {
+                            throw new Error(`伺服器回傳錯誤代碼 ${res.status}`);
+                        }
+
+                        const result = await res.json();
+
+                        if (result.error) {
+                            document.getElementById('status').innerText = '❌ 錯誤: ' + result.error;
+                            document.getElementById('ocrTranslated').innerText = result.error;
+                        } else {
+                            document.getElementById('ocrOriginal').innerText = result.ocrOriginal || "未偵測到文字";
+                            document.getElementById('ocrTranslated').innerText = result.ocrTranslated || "無翻譯結果";
+                            lastText = result.ocrTranslated;
+                            document.getElementById('status').innerText = '✅ 辨識成功！';
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        document.getElementById('status').innerText = '❌ 連線或後端出錯: ' + e.message;
+                        document.getElementById('ocrTranslated').innerText = "連線失敗，請檢查終端機 Log。";
+                    } finally {
+                        isProcessingOCR = false;
+                    }
+                }, 'image/jpeg', 0.85);
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = '❌ 拍照流程崩潰: ' + e.message;
+                isProcessingOCR = false;
+            }
         };
 
-    });
-}
-
-async function initSpeech() {
-    VOICES = await loadVoices();
-}
-
-// ============================
-// ⭐ 2. 解鎖音訊
-// ============================
-document.body.addEventListener("click", () => {
-
-    if (!audioUnlocked) {
-
-        speechSynthesis.speak(
-            new SpeechSynthesisUtterance("")
-        );
-
-        audioUnlocked = true;
-    }
-
-}, { once: true });
-
-// ============================
-// ⭐ 3. 初始化語言
-// ============================
-async function initLangs() {
-
-    try {
-
-        const res =
-            await fetch("/languages?v=" + Date.now());
-
-        const langs = await res.json();
-
-        const sel =
-            document.getElementById("target");
-
-        sel.innerHTML = "";
-
-        langs.forEach(l => {
-
-            const opt =
-                document.createElement("option");
-
-            opt.value = l.name;
-
-            opt.textContent =
-                `${l.name} ${l.label}`;
-
-            opt.dataset.v = l.voice;
-
-            sel.appendChild(opt);
-
-        });
-
-        const saved =
-            localStorage.getItem("targetLang");
-
-        if (saved) {
-            sel.value = saved;
-        }
-
-        sync();
-
-    } catch(e) {
-
-        document.getElementById("status").innerText =
-            "語言載入失敗";
-    }
-}
-
-function sync() {
-
-    const sel =
-        document.getElementById("target");
-
-    localStorage.setItem(
-        "targetLang",
-        sel.value
-    );
-}
-
-document
-    .getElementById("target")
-    .addEventListener("change", sync);
-
-// ============================
-// ⭐ 4. 語音辨識
-// ============================
-function initRecognition() {
-
-    const Speech =
-        window.webkitSpeechRecognition ||
-        window.SpeechRecognition;
-
-    if (!Speech) {
-
-        document.getElementById("status").innerText =
-            "不支援語音";
-
-        return;
-    }
-
-    recognition = new Speech();
-
-    recognition.continuous = false;
-
-    recognition.onresult = (e) => {
-
-        const text =
-            e.results[0][0].transcript;
-
-        document.getElementById("original")
-            .innerText = text;
-
-        handleTranslation(text);
-    };
-
-    // ⭐ 改良錯誤提示
-    recognition.onerror = (e) => {
-
-        console.log(e.error);
-
-        if (
-            e.error === "service-not-allowed" ||
-            e.error === "language-not-supported"
-        ) {
-
-            document.getElementById("status").innerText =
-                "⚠️ 此語言可能不支援語音翻譯";
-
-        } else if (e.error === "no-speech") {
-
-            document.getElementById("status").innerText =
-                "⚠️ 沒有聽到聲音";
-
-        } else {
-
-            document.getElementById("status").innerText =
-                "⚠️ 語音辨識失敗";
-        }
-
-        resetUI();
-    };
-
-    recognition.onend = resetUI;
-}
-
-// ============================
-// ⭐ 5. 麥克風
-// ============================
-function runMic(mode) {
-
-    if (isProcessing) return;
-
-    speechSynthesis.cancel();
-
-    if (!recognition) {
-        initRecognition();
-    }
-
-    const sel =
-        document.getElementById("target");
-
-    const isMe = (mode === "me");
-
-    recognition.lang =
-        isMe
-        ? "zh-TW"
-        : sel.selectedOptions[0].dataset.v;
-
-    document
-        .querySelectorAll('.mic-btn')
-        .forEach(b => b.classList.remove('active'));
-
-    document
-        .getElementById(
-            isMe ? "btn-me" : "btn-other"
-        )
-        .classList.add("active");
-
-    try {
-        recognition.abort();
-    } catch(e) {}
-
-    setTimeout(() => {
-
-        try {
-
-            recognition.start();
-
-            document.getElementById("status")
-                .innerText = "🎤 聆聽中...";
-
-        } catch(err) {
-
-            document.getElementById("status")
-                .innerText = "⚠️ 無法啟動語音辨識";
-        }
-
-    }, 300);
-}
-
-// ============================
-// ⭐ 6. 翻譯
-// ============================
-async function handleTranslation(text) {
-
-    isProcessing = true;
-
-    document.getElementById("status")
-        .innerText = "翻譯中...";
-
-    const sel =
-        document.getElementById("target");
-
-    const isMe =
-        (recognition.lang === "zh-TW");
-
-    try {
-
-        const res = await fetch("/translate", {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type":"application/json"
-            },
-
-            body: JSON.stringify({
-                text,
-                target: sel.value,
-                mode: isMe ? "me" : "other"
-            })
-
-        });
-
-        const data = await res.json();
-
-        // ⭐ 防止空翻譯
-        if (!data.translatedText) {
-
-            document.getElementById("translated")
-                .innerText = "⚠️ 無法翻譯";
-
-            document.getElementById("status")
-                .innerText = "翻譯失敗";
-
-            isProcessing = false;
-            return;
-        }
-
-        document.getElementById("translated")
-            .innerText = data.translatedText;
-
-        document.getElementById("status")
-            .innerText = "完成";
-
-        const playLang =
-            isMe
-            ? sel.selectedOptions[0].dataset.v
-            : "zh-TW";
-
-        speak(data.translatedText, playLang);
-
-    } catch(err) {
-
-        document.getElementById("translated")
-            .innerText = "⚠️ 翻譯失敗";
-
-        document.getElementById("status")
-            .innerText = "翻譯失敗";
-    }
-
-    isProcessing = false;
-}
-
-// ============================
-// ⭐ 7. 語音播放
-// ============================
-function speak(text, lang) {
-
-    /* ⭐ 記住最後播放 */
-    lastSpeakText = text;
-    lastSpeakLang = lang;
-
-    speechSynthesis.cancel();
-
-    const msg =
-        new SpeechSynthesisUtterance(text);
-
-    const voice =
-
-        VOICES.find(v =>
-            v.lang.replace('_','-') === lang
-        )
-
-        ||
-
-        VOICES.find(v =>
-            v.lang.startsWith(
-                lang.split('-')[0]
-            )
-        );
-
-    if (voice) {
-        msg.voice = voice;
-    }
-
-    msg.lang = lang;
-
-    setTimeout(() => {
-
-        speechSynthesis.speak(msg);
-
-    }, 120);
-}
-
-// ============================
-// ⭐ 8. 重播
-// ============================
-function replayAudio() {
-
-    if (!lastSpeakText) {
-
-        document.getElementById("status")
-            .innerText = "沒有可重播內容";
-
-        return;
-    }
-
-    document.getElementById("status")
-        .innerText = "🔊 重播中...";
-
-    speak(lastSpeakText, lastSpeakLang);
-}
-
-// ============================
-function resetUI() {
-
-    document
-        .querySelectorAll('.mic-btn')
-        .forEach(b => b.classList.remove('active'));
-}
-
-// ============================
-function testSpeech() {
-
-    speak("語音正常", "zh-TW");
-}
-
-// ============================
-// INIT
-// ============================
-initSpeech();
-initLangs();
-initRecognition();
-
-</script>
-
+        document.getElementById('speakOCR').onclick = () => {
+            const text = document.getElementById('ocrTranslated').innerText;
+            if (text && text !== "計算中..." && text !== "無翻譯結果") { speak(text, 'zh-TW'); }
+        };
+
+        (async () => {
+            await loadVoices();
+            await loadLanguages();
+            initRecognition();
+            showVoicePage();
+        })();
+    </script>
 </body>
+
 </html>
 
 
