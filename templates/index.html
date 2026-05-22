@@ -3,171 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 免費語音與相機翻譯機</title>
-    <!-- 引入前端免費 OCR 引擎，不佔用伺服器記憶體 -->
+    <title>AI 語音與相機翻譯機</title>
+    <!-- 引入前端免費 OCR 引擎 -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
+        /* 保留你原本喜愛的精美 UI 樣式 */
         :root {
-            --primary-color: #4a90e2;
-            --bg-color: #f5f7fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        .container {
-            max-width: 600px;
+        .app-container {
+            max-width: 500px;
             width: 100%;
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
             box-sizing: border-box;
         }
         h1 {
+            font-size: 22px;
             text-align: center;
-            font-size: 24px;
-            color: var(--primary-color);
             margin-top: 0;
+            margin-bottom: 24px;
+            color: var(--primary);
         }
-        .section {
-            margin-bottom: 25px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eeeeee;
-        }
-        .section:last-child {
-            border-bottom: none;
+        .card-section {
+            background: #f1f5f9;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
         }
         label {
             display: block;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 600;
             margin-bottom: 8px;
+            color: #475569;
         }
-        select, button, input[type="file"] {
+        select, input[type="file"] {
             width: 100%;
             padding: 12px;
-            margin-bottom: 10px;
             border-radius: 8px;
-            border: 1px solid #cccccc;
+            border: 1px solid var(--border);
             font-size: 16px;
+            background: var(--card);
             box-sizing: border-box;
         }
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #357abd;
-        }
-        button.secondary {
-            background-color: #e0e0e0;
-            color: #333;
-        }
-        button.secondary:hover {
-            background-color: #d0d0d0;
-        }
-        .result-box {
-            background: #f9f9f9;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e8e8e8;
-            min-height: 50px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            margin-top: 8px;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            color: #666666;
-            font-style: italic;
-            margin: 10px 0;
-        }
-        .btn-group {
+        .grid-btns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 12px;
+            margin-bottom: 12px;
         }
-        .status-text {
-            font-size: 14px;
-            color: #ef820a;
-            font-weight: bold;
-            text-align: center;
+        button {
+            padding: 14px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-main {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-main:hover {
+            background: var(--primary-hover);
+        }
+        .btn-replay {
+            background: #10b981;
+            color: white;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn-replay:hover {
+            background: #059669;
+        }
+        /* 即時日誌監控與結果視窗樣式 */
+        .log-box {
+            background: #0f172a;
+            color: #38bdf8;
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            min-height: 40px;
+            max-height: 100px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+        }
+        .result-title {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 8px;
+            margin-bottom: 2px;
+        }
+        .display-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 8px;
+            min-height: 44px;
+            font-size: 16px;
+            word-break: break-all;
+            white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🌐 免費雙向翻譯機 (免 Key 版)</h1>
+<div class="app-container">
+    <h1>🌐 AI 雙向語音與相機翻譯</h1>
 
-    <!-- 語言選擇區 -->
-    <div class="section">
-        <label for="langSelect">選擇目標外語：</label>
+    <!-- 1. 語言選擇選單 -->
+    <div class="card-section">
+        <label for="langSelect">請選擇目標語系：</label>
         <select id="langSelect">
-            <!-- 這裡會由後端動態載入，先放預設值放閃退 -->
-            <option value="日文">日本語 🇯🇵</option>
-            <option value="英文">English 🇺🇸</option>
-            <option value="韓文">한국어 🇰🇷</option>
+            <!-- 由後端動態載入 -->
         </select>
     </div>
 
-    <!-- 🎤 語音與文字翻譯區 -->
-    <div class="section">
-        <label>🎤 語音 / 文字雙向翻譯</label>
-        <div class="btn-group">
-            <button id="btnMeToOther">🗣️ 我說中文 (翻外語)</button>
-            <button id="btnOtherToMe">🎧 對方說外語 (翻中文)</button>
+    <!-- 2. 🎤 語音雙向翻譯區 -->
+    <div class="card-section">
+        <label>🎤 語音雙向對話</label>
+        <div class="grid-btns">
+            <button class="btn-main" id="btnMe">🗣️ 我說中文</button>
+            <button class="btn-main" id="btnOther" style="background:#0284c7;">🎧 對方說外語</button>
         </div>
-        <div id="voiceStatus" class="status-text"></div>
         
-        <label style="margin-top: 15px; font-size: 14px;">辨識原文：</label>
-        <div id="voiceOriginal" class="result-box"></div>
+        <div class="result-title">即時狀態監控日誌：</div>
+        <div id="voiceLog" class="log-box">準備就緒</div>
+
+        <div class="result-title">辨識原文：</div>
+        <div id="voiceOriginal" class="display-box"></div>
+
+        <div class="result-title">翻譯結果：</div>
+        <div id="voiceTranslated" class="display-box" style="font-weight: bold; color: #1e1b4b;"></div>
         
-        <label style="margin-top: 10px; font-size: 14px;">翻譯結果：</label>
-        <div id="voiceTranslated" class="result-box"></div>
+        <!-- 🔊 重新播放按鈕 -->
+        <button class="btn-replay" id="btnReplayVoice">🔊 重新播放語音</button>
     </div>
 
-    <!-- 📸 相機與圖片 OCR 區 -->
-    <div class="section">
-        <label>📸 圖片 / 拍照翻譯</label>
+    <!-- 3. 📸 相機拍照與圖片翻譯區 -->
+    <div class="card-section">
+        <label>📸 相機拍照 / 圖片翻譯</label>
         <input type="file" id="imageInput" accept="image/*" capture="environment">
+
+        <div class="result-title">OCR 狀態日誌：</div>
+        <div id="ocrLog" class="log-box">等待上傳圖片...</div>
+
+        <div class="result-title">圖片辨識原文：</div>
+        <div id="ocrOriginal" class="display-box"></div>
+
+        <div class="result-title">圖片翻譯結果：</div>
+        <div id="ocrTranslated" class="display-box" style="font-weight: bold; color: #1e1b4b;"></div>
         
-        <div id="ocrLoading" class="loading">正在前端進行文字辨識 (OCR)，請稍候...</div>
-        
-        <label style="margin-top: 15px; font-size: 14px;">圖片辨識原文：</label>
-        <div id="ocrOriginalResult" class="result-box"></div>
-        
-        <label style="margin-top: 10px; font-size: 14px;">圖片翻譯結果：</label>
-        <div id="ocrTranslatedResult" class="result-box"></div>
+        <!-- 🔊 OCR 重新播放按鈕 -->
+        <button class="btn-replay" id="btnReplayOcr" style="background: #8b5cf6;">🔊 重新播放翻譯</button>
     </div>
 </div>
 
 <script>
     let languagesConfig = [];
     let recognition = null;
+    let lastVoiceText = "";      // 記錄最後一次語音翻譯結果用於重播
+    let lastVoiceVoiceCode = ""; // 記錄最後一次語音播放語系
+    let lastOcrText = "";        // 記錄最後一次 OCR 翻譯結果用於重播
 
-    // 1. 網頁初始化：載入選單
+    // 頁面初始化：載入選單與語音引擎
     window.addEventListener('DOMContentLoaded', async () => {
         try {
             const res = await fetch('/languages');
             languagesConfig = await res.json();
             
             const select = document.getElementById('langSelect');
-            select.innerHTML = ''; // 清空預設
-            
+            select.innerHTML = '';
             languagesConfig.forEach(lang => {
                 const opt = document.createElement('option');
                 opt.value = lang.name;
@@ -175,128 +202,99 @@
                 select.appendChild(opt);
             });
         } catch (err) {
-            console.error("載入語言檔失敗，使用網頁預設語系", err);
+            document.getElementById('voiceLog').innerText = "預設語系選單載入失敗";
         }
 
-        // 初始化瀏覽器內建語音辨識 (Web Speech API)
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
         } else {
-            alert("您的瀏覽器不支援內建語音辨識，語音功能將無法使用（建議使用 Safari 或 Chrome）");
+            document.getElementById('voiceLog').innerText = "提示：此瀏覽器不支援 Speech API，請用 Safari/Chrome";
         }
     });
 
-    // 取得當前選中語言的詳細物件資料
     function getSelectedLangObj() {
         const name = document.getElementById('langSelect').value;
         return languagesConfig.find(l => l.name === name) || { name: "英文", code: "en", voice: "en-US" };
     }
 
-    // 🔊 瀏覽器內建語音朗讀 (TTS)
+    // 🔊 核心語音播放函式 (TTS)
     function speakText(text, langCode) {
         if (!window.speechSynthesis) return;
-        // 停止上一次還沒唸完的語音
-        window.speechSynthesis.cancel();
+        window.speechSynthesis.cancel(); // 停止上一段
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = langCode;
         window.speechSynthesis.speak(utterance);
     }
 
-    // 🎤 處理語音翻譯的核心函式
+    // 🎤 語音翻譯邏輯
     function startVoiceTranslation(mode) {
         if (!recognition) return;
-        
         const targetLang = getSelectedLangObj();
-        const statusDiv = document.getElementById('voiceStatus');
-        const originalDiv = document.getElementById('voiceOriginal');
-        const translatedDiv = document.getElementById('voiceTranslated');
+        const logBox = document.getElementById('voiceLog');
+        const originalBox = document.getElementById('voiceOriginal');
+        const translatedBox = document.getElementById('voiceTranslated');
 
-        // 設定語音辨識的輸入語言
         if (mode === 'me') {
-            recognition.lang = 'zh-TW'; // 我說中文
-            statusDiv.innerText = "請開始說中文...";
+            recognition.lang = 'zh-TW';
+            logBox.innerText = "[系統] 請開始說中文...";
         } else {
-            recognition.lang = targetLang.voice || 'en-US'; // 對方說外語
-            statusDiv.innerText = `請開始說 ${targetLang.name}...`;
+            recognition.lang = targetLang.voice || 'en-US';
+            logBox.innerText = `[系統] 請開始說 ${targetLang.name}...`;
         }
 
         recognition.start();
 
         recognition.onresult = async (event) => {
             const resultText = event.results[0][0].transcript;
-            originalDiv.innerText = resultText;
-            statusDiv.innerText = "正在免費翻譯中...";
+            originalBox.innerText = resultText;
+            logBox.innerText = `[辨識成功] 有效文字: "${resultText}"\n[系統] 正在發送免費翻譯...`;
 
             try {
-                // 發送給後端做免費的 Google 翻譯
                 const response = await fetch('/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: resultText,
-                        target: targetLang.name,
-                        mode: mode
-                    })
+                    body: JSON.stringify({ text: resultText, target: targetLang.name, mode: mode })
                 });
                 const data = await response.json();
                 
                 if (data.translatedText) {
-                    translatedDiv.innerText = data.translatedText;
-                    statusDiv.innerText = "翻譯完成！";
+                    translatedBox.innerText = data.translatedText;
+                    logBox.innerText = "[翻譯完成] 成功獲得結果，觸發語音朗讀。";
                     
-                    // 自動語音朗讀成果
-                    if (mode === 'me') {
-                        // 中翻外：朗讀外語
-                        speakText(data.translatedText, targetLang.voice);
-                    } else {
-                        // 外翻中：朗讀中文
-                        speakText(data.translatedText, 'zh-TW');
-                    }
+                    // 紀錄重播資訊並播放
+                    lastVoiceText = data.translatedText;
+                    lastVoiceVoiceCode = (mode === 'me') ? targetLang.voice : 'zh-TW';
+                    speakText(lastVoiceText, lastVoiceVoiceCode);
                 } else {
-                    statusDiv.innerText = "翻譯回傳空值";
+                    logBox.innerText = "[警告] 翻譯回傳空值";
                 }
             } catch (err) {
-                statusDiv.innerText = "翻譯失敗";
-                console.error(err);
+                logBox.innerText = "[錯誤] 請求失敗，請檢查網路。";
             }
         };
 
         recognition.onerror = (e) => {
-            statusDiv.innerText = `語音辨識出錯 (${e.error})`;
-            console.error(e);
-        };
-
-        recognition.onend = () => {
-            if (statusDiv.innerText.startsWith("請開始說")) {
-                statusDiv.innerText = "未偵測到聲音，請重試。";
-            }
+            logBox.innerText = `[錯誤] 語音辨識失敗 (${e.error})`;
         };
     }
 
-    // 綁定語音按鈕事件
-    document.getElementById('btnMeToOther').addEventListener('click', () => startVoiceTranslation('me'));
-    document.getElementById('btnOtherToMe').addEventListener('click', () => startVoiceTranslation('other'));
-
-
-    // 📸 📸 📸 圖片/相機 OCR 處理區 (核心改寫：改由前端 Tesseract.js 執行) 📸 📸 📸
+    // 📸 圖片 OCR 處理區（完美對接舊版 UI）
     document.getElementById('imageInput').addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
         const menuLang = document.getElementById('langSelect').value;
-        const loadingDiv = document.getElementById('ocrLoading');
-        const ocrOriginalDiv = document.getElementById('ocrOriginalResult');
-        const ocrTranslatedDiv = document.getElementById('ocrTranslatedResult');
+        const ocrLog = document.getElementById('ocrLog');
+        const ocrOriginal = document.getElementById('ocrOriginal');
+        const ocrTranslated = document.getElementById('ocrTranslated');
 
-        // 清空舊數據並顯示轉圈提示
-        ocrOriginalDiv.innerText = "";
-        ocrTranslatedDiv.innerText = "";
-        loadingDiv.style.display = "block";
+        ocrOriginal.innerText = "";
+        ocrTranslated.innerText = "";
+        ocrLog.innerText = "[OCR] 正在啟動前端辨識引擎...";
 
-        // 對應 Tesseract.js 的前端語系包代碼
         let tesseractLang = 'eng'; 
         if (menuLang === '日文') tesseractLang = 'jpn';
         else if (menuLang === '韓文') tesseractLang = 'kor';
@@ -306,11 +304,10 @@
         else if (menuLang === '西班牙文') tesseractLang = 'spa';
 
         try {
-            // 步驟 1：直接在手機/電腦本地瀏覽器進行 OCR 識別，完全不消耗伺服器記憶體！
             const result = await Tesseract.recognize(file, tesseractLang, {
                 logger: m => {
                     if (m.status === 'recognizing') {
-                        loadingDiv.innerText = `文字辨識中：${Math.floor(m.progress * 100)}%`;
+                        ocrLog.innerText = `[辨識中] 進度：${Math.floor(m.progress * 100)}%`;
                     }
                 }
             });
@@ -318,42 +315,61 @@
             const detectedText = result.data.text ? result.data.text.trim() : "";
 
             if (!detectedText) {
-                loadingDiv.style.display = "none";
-                ocrOriginalDiv.innerText = "未能辨識出文字";
-                ocrTranslatedDiv.innerText = "圖片中似乎找不到文字，請換張更清晰的相片再試。";
+                ocrLog.innerText = "[OCR 結束] 未能在圖中找到清晰文字。";
+                ocrOriginal.innerText = "未能辨識出文字";
                 return;
             }
 
-            ocrOriginalDiv.innerText = detectedText;
-            loadingDiv.innerText = "辨識成功！正在調用後端免費 Google 翻譯...";
+            ocrOriginal.innerText = detectedText;
+            ocrLog.innerText = "[OCR 成功] 正在調用後端進行翻譯...";
 
-            // 步驟 2：將辨識出的文字傳給後端路由進行文字翻譯
             const response = await fetch('/ocr_translate_text', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: detectedText,
-                    menu_lang: menuLang
-                })
+                body: JSON.stringify({ text: detectedText, menu_lang: menuLang })
             });
 
             const data = await response.json();
             
             if (data.ocrTranslated) {
-                ocrTranslatedDiv.innerText = data.ocrTranslated;
+                ocrTranslated.innerText = data.ocrTranslated;
+                ocrLog.innerText = "[翻譯完成] 已成功渲染結果。";
+                
+                // 儲存 OCR 翻譯結果供重播（預設唸繁體中文）
+                lastOcrText = data.ocrTranslated;
+                speakText(lastOcrText, 'zh-TW');
             } else {
-                ocrTranslatedDiv.innerText = "翻譯失敗，請重新嘗試。";
+                ocrLog.innerText = "[錯誤] 後端翻譯未成功回傳結果。";
             }
 
         } catch (error) {
-            console.error("前端 OCR 發生錯誤:", error);
-            ocrOriginalDiv.innerText = "辨識發生錯誤";
-            ocrTranslatedDiv.innerText = error.message;
+            ocrLog.innerText = `[執行失敗] ${error.message}`;
         } finally {
-            loadingDiv.style.display = "none";
-            loadingDiv.innerText = "正在前端進行文字辨識 (OCR)，請稍候...";
-            // 清空 input 讓同一張圖片可以重複觸發變更事件
-            document.getElementById('imageInput').value = "";
+            document.getElementById('imageInput').value = ""; // 清空欄位
+        }
+    });
+
+    // 🔘 按鈕事件綁定
+    document.getElementById('btnMe').addEventListener('click', () => startVoiceTranslation('me'));
+    document.getElementById('btnOther').addEventListener('click', () => startVoiceTranslation('other'));
+    
+    // 🔊 語音重播
+    document.getElementById('btnReplayVoice').addEventListener('click', () => {
+        if (lastVoiceText) {
+            speakText(lastVoiceText, lastVoiceVoiceCode);
+            document.getElementById('voiceLog').innerText = "[系統] 重新播放上次語音結果";
+        } else {
+            alert("目前沒有可播放的語音紀錄");
+        }
+    });
+
+    // 🔊 OCR 重播
+    document.getElementById('btnReplayOcr').addEventListener('click', () => {
+        if (lastOcrText) {
+            speakText(lastOcrText, 'zh-TW');
+            document.getElementById('ocrLog').innerText = "[系統] 重新播放上次圖片翻譯結果";
+        } else {
+            alert("目前沒有可播放的圖片翻譯紀錄");
         }
     });
 </script>
